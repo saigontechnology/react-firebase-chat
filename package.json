@@ -4,13 +4,25 @@
   "description": "A comprehensive ReactJS Firebase Chat library with real-time messaging, user authentication, and modern UI components",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "style": "dist/styles.css",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./styles": {
+      "import": "./dist/styles.css"
+    }
+  },
   "files": [
     "dist",
-    "src"
+    "src",
+    "postcss.config.js",
+    "tailwind.config.js"
   ],
   "scripts": {
     "build": "tsc && npm run build:css",
-    "build:css": "postcss src/styles/*.css -d dist/styles",
+    "build:css": "postcss src/styles.css -d dist && postcss src/components/*.css -d dist/components && postcss src/addons/*/*.css -d dist/addons --base src/addons && postcss src/styles/index.css -d dist/styles",
     "dev": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -18,7 +30,8 @@
     "lint:fix": "eslint src/**/*.{ts,tsx} --fix",
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "postinstall": "npm run build"
   },
   "keywords": [
     "react",

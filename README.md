@@ -134,11 +134,71 @@ The library has been tested and verified for seamless communication with React N
 
 ## Installation
 
+### From NPM (Recommended)
 ```bash
 npm install react-firebase-chat firebase
 # or
 yarn add react-firebase-chat firebase
 ```
+
+### From GitHub
+```bash
+npm install git+https://github.com/your-username/react-firebase-chat.git firebase
+# or
+yarn add git+https://github.com/your-username/react-firebase-chat.git firebase
+```
+
+> **Note**: When installing from GitHub, the package will automatically build the `dist` folder during installation thanks to the `postinstall` script.
+
+### Importing Styles
+
+The library includes CSS styles that need to be imported for proper styling. You have several options:
+
+#### Option 1: Import All Styles (Recommended)
+```tsx
+import 'react-firebase-chat/styles';
+```
+
+#### Option 2: Import Individual Component Styles
+```tsx
+// Import specific component styles
+import 'react-firebase-chat/dist/components/ChatScreen.css';
+import 'react-firebase-chat/dist/addons/camera/CameraView.css';
+import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
+import 'react-firebase-chat/dist/addons/gallery/GalleryView.css';
+import 'react-firebase-chat/dist/addons/gallery/MediaViewer.css';
+```
+
+#### Option 3: Import in Your CSS File
+```css
+@import 'react-firebase-chat/styles';
+```
+
+### Troubleshooting CSS Issues
+
+If you're experiencing missing styles or CSS not loading:
+
+1. **Make sure you've imported the styles**:
+   ```tsx
+   import 'react-firebase-chat/styles';
+   ```
+
+2. **Check if the dist folder exists** after installation:
+   ```bash
+   ls node_modules/react-firebase-chat/dist/
+   ```
+
+3. **If installing from GitHub and dist folder is missing**, run:
+   ```bash
+   cd node_modules/react-firebase-chat
+   npm run build
+   ```
+
+4. **For individual component styles**, import them directly:
+   ```tsx
+   import 'react-firebase-chat/dist/addons/camera/CameraView.css';
+   import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
+   ```
 
 ## 🚀 Quick Start
 
@@ -149,6 +209,7 @@ Perfect for testing and simple integrations:
 ```tsx
 import React from 'react';
 import { SimpleChat, SimpleUser } from 'react-firebase-chat';
+import 'react-firebase-chat/styles'; // Import styles
 
 const MyApp = () => {
   const currentUser: SimpleUser = {
@@ -179,6 +240,7 @@ For production applications with full cross-platform sync:
 ```tsx
 import React from 'react';
 import { ChatProvider, ChatScreen } from 'react-firebase-chat';
+import 'react-firebase-chat/styles'; // Import styles
 
 const firebaseConfig = {
   apiKey: "your-web-api-key",

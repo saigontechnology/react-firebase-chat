@@ -100,6 +100,8 @@ export interface LatestMessageProps {
   senderId: string;
   senderName: string;
   text: string;
+  name?: string;
+  readBy?: Record<string, boolean>;
   type?: MessageTypes;
   path?: string;
   extension?: string;

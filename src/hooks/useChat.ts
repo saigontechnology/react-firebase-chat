@@ -5,14 +5,15 @@ import { Message, User, UseChatReturn } from '../types';
 export interface UseChatProps {
   userId: string;
   conversationId?: string;
+  memberIds?: string[];
 }
 
-export const useChat = ({ userId, conversationId }: UseChatProps): UseChatReturn => {
+export const useChat = ({ userId, conversationId, memberIds }: UseChatProps): UseChatReturn => {
+  const chatService = ChatService.getInstance();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const chatService = new ChatService();
 
   // Send a text message
   const sendMessage = useCallback(async (text: string) => {
@@ -32,12 +33,12 @@ export const useChat = ({ userId, conversationId }: UseChatProps): UseChatReturn
         createdAt: new Date(),
       };
 
-      await chatService.sendMessage(conversationId, messageData);
+      await chatService.sendMessage(conversationId, messageData, { memberIds });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
       throw err;
     }
-  }, [conversationId, userId, chatService]);
+  }, [conversationId, userId, chatService, memberIds]);
 
   // Delete a message
   const deleteMessage = useCallback(async (messageId: string) => {

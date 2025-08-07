@@ -80,4 +80,4 @@ export * from './utils/validation';
 export * from './utils/encryption';
 
 // Styles
-import './styles/index.css';
+import './styles.css';

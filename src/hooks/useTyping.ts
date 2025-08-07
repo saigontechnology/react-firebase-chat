@@ -3,11 +3,11 @@ import { ChatService } from '../services/chat';
 import { TypingUser, UseTypingReturn } from '../types';
 
 export const useTyping = (roomId: string, userId: string): UseTypingReturn => {
+  const chatService = ChatService.getInstance();
+
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingRef = useRef(false);
-
-  const chatService = new ChatService();
 
   useEffect(() => {
     if (!roomId) return;

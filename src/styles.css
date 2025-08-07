@@ -1,0 +1,13 @@
+/* Main CSS entry point for React Firebase Chat library */
+
+/* Core styles */
+@import './styles/index.css';
+
+/* Component styles */
+@import './components/ChatScreen.css';
+
+/* Addon styles */
+@import './addons/camera/CameraView.css';
+@import './addons/fileUpload/FileUploader.css';
+@import './addons/gallery/GalleryView.css';
+@import './addons/gallery/MediaViewer.css'; 

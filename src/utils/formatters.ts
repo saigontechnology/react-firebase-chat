@@ -67,6 +67,27 @@ export const formatMessageText = (message: MessageProps): string => {
   }
 };
 
+export const convertToLatestMessage = (
+  userId: string,
+  name: string,
+  message: string,
+  type?: MessageTypes,
+  path?: string,
+  extension?: string
+): LatestMessageProps => ({
+  text: message ?? '',
+  senderId: userId,
+  name: name,
+  senderName: name,
+  createdAt: new Date(),
+  readBy: {
+    [userId]: true,
+  },
+  type: type ?? MessageTypes.text,
+  path: path ?? '',
+  extension: extension ?? '',
+});
+
 // Format latest message for conversation list
 export const formatLatestMessage = (latestMessage: LatestMessageProps): string => {
   if (!latestMessage) return '';

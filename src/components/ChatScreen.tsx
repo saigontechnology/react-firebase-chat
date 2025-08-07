@@ -63,6 +63,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   } = useChat({
     userId: currentUser?._id.toString() || '',
     conversationId,
+    memberIds: [...new Set([`${currentUser._id}`, ...partners.map(partner => partner.id)])],
   });
 
   const handleSendMessage = useCallback(async (text: string) => {

@@ -12,8 +12,21 @@ import { getFirebaseAuth, getFirebaseFirestore } from './firebase';
 import { User } from '../types';
 
 export class AuthService {
-  private auth = getFirebaseAuth();
-  private db = getFirebaseFirestore();
+  static instance: AuthService;
+  private auth;
+  private db;
+
+  constructor() {
+    this.auth = getFirebaseAuth();
+    this.db = getFirebaseFirestore();
+  }
+
+  static getInstance(): AuthService {
+    if (!AuthService.instance) {
+      AuthService.instance = new AuthService();
+    }
+    return AuthService.instance;
+  }
 
   // Sign in with email and password
   async signIn(email: string, password: string): Promise<FirebaseUser> {
@@ -168,6 +181,3 @@ export class AuthService {
     return new Error(message);
   }
 }
-
-// Export singleton instance
-export const authService = new AuthService();

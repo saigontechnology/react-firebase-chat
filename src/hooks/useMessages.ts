@@ -4,13 +4,13 @@ import { ChatService } from '../services/chat';
 import { Message, UseMessagesReturn } from '../types';
 
 export const useMessages = (roomId: string, initialLimit: number = 50): UseMessagesReturn => {
+  const chatService = ChatService.getInstance();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const lastMessageDocRef = useRef<DocumentSnapshot | null>(null);
-
-  const chatService = new ChatService();
 
   useEffect(() => {
     if (!roomId) return;
