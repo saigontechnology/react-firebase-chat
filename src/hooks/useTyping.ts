@@ -19,7 +19,7 @@ export const useTyping = (roomId: string, userId: string): UseTypingReturn => {
         .map(([uid]) => ({
           uid,
           displayName: `User ${uid}`, // We'd need to get actual user data
-          timestamp: new Date(),
+          timestamp: Date.now(),
         }));
 
       setTypingUsers(usersArray);

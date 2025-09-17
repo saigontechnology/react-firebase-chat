@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { ConnectionStatus } from './ConnectionStatus';
 import { useChatContext } from '../context/ChatProvider';
-import { CameraView } from '../addons/camera/CameraView';
 import { FileUploader } from '../addons/fileUpload/FileUploader';
 import { GalleryView } from '../addons/gallery/GalleryView';
 import { useChat } from '../hooks/useChat';
-import { Message, User, SimpleUser } from '../types';
+import { Message, IUser } from '../types';
 import './ChatScreen.css';
 
 export interface ChatScreenProps {
@@ -25,6 +24,7 @@ export interface ChatScreenProps {
   showCamera?: boolean;
   showFileUpload?: boolean;
   showGallery?: boolean;
+  isGroup?: boolean;
 }
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({
@@ -37,15 +37,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   showCamera = true,
   showFileUpload = true,
   showGallery = true,
+  isGroup = false,
 }) => {
   const { currentUser, isInitialized } = useChatContext();
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
   const [galleryFiles, setGalleryFiles] = useState([]);
 
-  // Convert currentUser from IUser to SimpleUser format for components
-  const convertedUser: SimpleUser = currentUser ? {
-    id: currentUser._id.toString(),
+  const convertedUser: IUser = currentUser ? {
+    id: currentUser.id.toString(),
     name: currentUser.name || 'Unknown User',
     avatar: currentUser.avatar,
   } : {
@@ -61,9 +61,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     sendMessage,
     markAsRead,
   } = useChat({
-    userId: currentUser?._id.toString() || '',
+    user: currentUser,
     conversationId,
-    memberIds: [...new Set([`${currentUser._id}`, ...partners.map(partner => partner.id)])],
+    memberIds: [...new Set([`${currentUser.id}`, ...partners.map(partner => partner.id)])],
+    name: isGroup ? `group_${currentUser.id},${partners.map(partner => partner.name).join(',')}` : partners.find(partner => partner.id !== currentUser.id)?.name,
   });
 
   const handleSendMessage = useCallback(async (text: string) => {
@@ -180,16 +181,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
         {/* Action Buttons */}
         <div className="action-buttons">
-          {showCamera && (
-            <button
-              className="action-button camera-button"
-              onClick={() => setIsCameraOpen(true)}
-              title="Camera"
-            >
-              📷
-            </button>
-          )}
-
           {showFileUpload && (
             <button
               className="action-button upload-button"
@@ -214,14 +205,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           />
         </div>
       )}
-
-      {/* Camera Modal */}
-      <CameraView
-        isOpen={isCameraOpen}
-        onClose={() => setIsCameraOpen(false)}
-        onCapture={handleCameraCapture}
-        mode="photo"
-      />
 
       {/* File Uploader Modal */}
       {showUploader && (

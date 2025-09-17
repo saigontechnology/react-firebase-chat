@@ -194,7 +194,7 @@ export const WebMessageList: React.FC<{messages: any[]}> = ({ messages }) => {
   return (
     <div className="web-message-list">
       {messages.map((message) => (
-        <WebMessage key={message._id} message={message} />
+        <WebMessage key={message.id} message={message} />
       ))}
     </div>
   );
@@ -294,7 +294,7 @@ yarn add rn-firebase-chat firebase
 
 ```tsx
 import React from 'react';
-import { WebChatProvider, WebChatScreen } from 'rn-firebase-chat/web';
+import { ChatProvider, ChatScreen } from 'react-firebase-chat';
 
 const firebaseConfig = {
   apiKey: "your-api-key",
@@ -313,12 +313,12 @@ const userInfo = {
 
 function App() {
   return (
-    <WebChatProvider 
-      userInfo={userInfo} 
+    <ChatProvider 
+      currentUser={userInfo} 
       firebaseConfig={firebaseConfig}
     >
       <ChatApp />
-    </WebChatProvider>
+    </ChatProvider>
   );
 }
 
@@ -330,7 +330,8 @@ function ChatApp() {
   };
 
   return (
-    <WebChatScreen 
+    <ChatScreen 
+      conversationId="conversation-123"
       memberIds={[partnerInfo.id]} 
       partners={[partnerInfo]} 
     />
@@ -339,6 +340,35 @@ function ChatApp() {
 
 export default App;
 ```
+
+### Services Reference for Web
+
+For advanced scenarios (custom messaging flows, server-controlled actions, background tasks), use the services directly. The web entry relies on the same service layer:
+
+```tsx
+import { initializeFirebase, ChatService, UserService } from 'react-firebase-chat';
+
+initializeFirebase(firebaseConfig);
+
+const chatService = ChatService.getInstance();
+const userService = UserService.getInstance();
+
+// Ensure user exists
+await userService.createUserIfNotExists(userInfo.id, { name: userInfo.name });
+
+// Create or use a conversation and send a message
+const conversationId = await chatService.createConversation([userInfo.id, 'partner-id'], userInfo.id, 'private');
+await chatService.sendMessage(conversationId, {
+  text: 'Hello from web!',
+  type: 'text',
+  senderId: String(userInfo.id),
+  readBy: { [String(userInfo.id)]: true },
+  path: '',
+  extension: ''
+});
+```
+
+See the full service API: [SERVICES.md](./SERVICES.md)
 
 ### Advanced Usage with Custom Components
 
@@ -349,13 +379,7 @@ const CustomChatScreen: React.FC = () => {
   const { sendMessage, messages } = useWebChat();
 
   const handleCustomSend = (messageText: string) => {
-    sendMessage({
-      text: messageText,
-      user: {
-        _id: 'current-user-id',
-        name: 'Current User',
-      },
-    });
+    sendMessage(messageText);
   };
 
   return (

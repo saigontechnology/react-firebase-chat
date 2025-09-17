@@ -10,7 +10,7 @@ export const useMessages = (roomId: string, initialLimit: number = 50): UseMessa
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const lastMessageDocRef = useRef<DocumentSnapshot | null>(null);
+  const latestMessageDocRef = useRef<DocumentSnapshot | null>(null);
 
   useEffect(() => {
     if (!roomId) return;
@@ -25,26 +25,17 @@ export const useMessages = (roomId: string, initialLimit: number = 50): UseMessa
       (newMessages, lastDoc?: DocumentSnapshot) => {
         // Store the last document for pagination
         if (lastDoc) {
-          lastMessageDocRef.current = lastDoc;
+          latestMessageDocRef.current = lastDoc;
         }
 
         // Convert IMessage to Message format (same conversion as in useChat)
         const convertedMessages: Message[] = newMessages.map((msg) => ({
-          id: msg._id,
+          id: msg.id,
           text: msg.text || '',
-          userId: typeof msg.user._id === 'string' ? msg.user._id : msg.user._id.toString(),
-          user: {
-            uid: typeof msg.user._id === 'string' ? msg.user._id : msg.user._id.toString(),
-            email: '', // Not available in IMessage
-            displayName: msg.user.name || 'Unknown User',
-            photoURL: msg.user.avatar,
-            isOnline: false, // Default status
-            lastSeen: new Date(), // Default last seen
-            status: 'offline' as const, // Default status
-          },
-          createdAt: msg.createdAt instanceof Date ? msg.createdAt : new Date(msg.createdAt),
+          userId: typeof msg.senderId === 'string' ? msg.senderId : '',
+          createdAt: msg.createdAt ? msg.createdAt : Date.now(),
           type: msg.image ? 'image' : msg.audio ? 'file' : msg.video ? 'file' : msg.system ? 'system' : 'text',
-          status: msg.pending ? 'sending' : msg.sent ? 'sent' : msg.received ? 'delivered' : 'read',
+          readBy: msg.readBy ?? {},
           metadata: msg.image ? {
             imageUrl: msg.image,
             fileType: 'image'
@@ -65,7 +56,7 @@ export const useMessages = (roomId: string, initialLimit: number = 50): UseMessa
   }, [roomId, initialLimit, chatService]);
 
   const loadMore = useCallback(async (): Promise<void> => {
-    if (!hasMore || loading || !lastMessageDocRef.current) return;
+    if (!hasMore || loading || !latestMessageDocRef.current) return;
 
     try {
       setLoading(true);
@@ -75,7 +66,7 @@ export const useMessages = (roomId: string, initialLimit: number = 50): UseMessa
       const olderMessages = await chatService.getMessagesWithPagination(
         roomId,
         initialLimit,
-        lastMessageDocRef.current
+        latestMessageDocRef.current
       );
 
       if (olderMessages.length === 0) {
@@ -85,21 +76,12 @@ export const useMessages = (roomId: string, initialLimit: number = 50): UseMessa
 
       // Convert and append older messages
       const convertedOlderMessages: Message[] = olderMessages.map((msg) => ({
-        id: msg._id,
+        id: msg.id,
         text: msg.text || '',
-        userId: typeof msg.user._id === 'string' ? msg.user._id : msg.user._id.toString(),
-        user: {
-          uid: typeof msg.user._id === 'string' ? msg.user._id : msg.user._id.toString(),
-          email: '', // Not available in IMessage
-          displayName: msg.user.name || 'Unknown User',
-          photoURL: msg.user.avatar,
-          isOnline: false, // Default status
-          lastSeen: new Date(), // Default last seen
-          status: 'offline' as const, // Default status
-        },
-        createdAt: msg.createdAt instanceof Date ? msg.createdAt : new Date(msg.createdAt),
+        userId: typeof msg.senderId === 'string' ? msg.senderId : '',
+        createdAt: msg.createdAt ? msg.createdAt : Date.now(),
         type: msg.image ? 'image' : msg.audio ? 'file' : msg.video ? 'file' : msg.system ? 'system' : 'text',
-        status: msg.pending ? 'sending' : msg.sent ? 'sent' : msg.received ? 'delivered' : 'read',
+        readBy: msg.readBy ?? {},
         metadata: msg.image ? {
           imageUrl: msg.image,
           fileType: 'image'

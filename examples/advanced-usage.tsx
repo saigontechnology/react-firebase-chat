@@ -29,7 +29,7 @@ const AdvancedChatExample: React.FC = () => {
   };
 
   const currentUser: IUser = {
-    _id: 'advanced-user-456',
+    id: 'advanced-user-456',
     name: 'Alice Johnson',
     avatar: 'https://example.com/alice.jpg'
   };
@@ -124,9 +124,9 @@ const ConversationSelector: React.FC<{
   onSelect: (id: string) => void;
 }> = ({ onSelect }) => {
   const conversations = [
-    { id: 'conv-1', name: 'Team Chat', lastMessage: 'Let\'s discuss the project' },
-    { id: 'conv-2', name: 'Bob Wilson', lastMessage: 'How are you doing?' },
-    { id: 'conv-3', name: 'Project Alpha', lastMessage: 'Meeting at 3 PM' },
+    { id: 'conv-1', name: 'Team Chat', latestMessage: 'Let\'s discuss the project' },
+    { id: 'conv-2', name: 'Bob Wilson', latestMessage: 'How are you doing?' },
+    { id: 'conv-3', name: 'Project Alpha', latestMessage: 'Meeting at 3 PM' },
   ];
 
   return (
@@ -164,7 +164,7 @@ const ConversationSelector: React.FC<{
           >
             <h4 style={{ margin: '0 0 8px 0' }}>{conv.name}</h4>
             <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
-              {conv.lastMessage}
+              {conv.latestMessage}
             </p>
           </div>
         ))}

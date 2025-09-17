@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ChatService } from '../services/chat';
-import { Message, User, UseChatReturn } from '../types';
+import {useState, useEffect, useCallback} from 'react';
+import {ChatService} from '../services/chat';
+import {Message, IUser, UseChatReturn, MediaType, MessageStatus} from '../types';
 
 export interface UseChatProps {
-  userId: string;
+  user: IUser;
   conversationId?: string;
   memberIds?: string[];
+  name?: string;
 }
 
-export const useChat = ({ userId, conversationId, memberIds }: UseChatProps): UseChatReturn => {
+export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): UseChatReturn => {
   const chatService = ChatService.getInstance();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -24,21 +25,26 @@ export const useChat = ({ userId, conversationId, memberIds }: UseChatProps): Us
 
       // Create a temporary message object that matches IMessage interface for the service
       const messageData = {
-        _id: '', // Will be set by service
         text,
-        user: {
-          _id: userId,
-          name: 'Current User', // This should come from user context
+        type: MediaType.text,
+        senderId: user?.id?.toString(),
+        readBy: {
+          [user?.id]: true,
         },
-        createdAt: new Date(),
+        path: '',
+        extension: '',
       };
 
-      await chatService.sendMessage(conversationId, messageData, { memberIds });
+      await chatService.sendMessage(conversationId, messageData, {
+        memberIds,
+        name: user?.name || 'Current User',
+        otherName: name,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
       throw err;
     }
-  }, [conversationId, userId, chatService, memberIds]);
+  }, [conversationId, user?.id, chatService, memberIds]);
 
   // Delete a message
   const deleteMessage = useCallback(async (messageId: string) => {
@@ -59,7 +65,7 @@ export const useChat = ({ userId, conversationId, memberIds }: UseChatProps): Us
       if (!conversationId) {
         throw new Error('No conversation selected');
       }
-      await chatService.updateMessage(conversationId, messageId, { text });
+      await chatService.updateMessage(conversationId, messageId, {text});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update message');
       throw err;
@@ -90,21 +96,12 @@ export const useChat = ({ userId, conversationId, memberIds }: UseChatProps): Us
     const unsubscribe = chatService.subscribeToMessages(conversationId, (newMessages) => {
       // Convert IMessage to Message format
       const convertedMessages: Message[] = newMessages.map((msg) => ({
-        id: msg._id,
+        id: msg.id,
         text: msg.text || '',
-        userId: typeof msg.user._id === 'string' ? msg.user._id : msg.user._id.toString(),
-        user: {
-          uid: typeof msg.user._id === 'string' ? msg.user._id : msg.user._id.toString(),
-          email: '', // Not available in IMessage
-          displayName: msg.user.name || 'Unknown User',
-          photoURL: msg.user.avatar,
-          isOnline: false, // Default status
-          lastSeen: new Date(), // Default last seen
-          status: 'offline' as const, // Default status
-        },
-        createdAt: msg.createdAt instanceof Date ? msg.createdAt : new Date(msg.createdAt),
+        userId: typeof msg.senderId === 'string' ? msg.senderId : '',
+        createdAt: msg.createdAt ? msg.createdAt : Date.now(),
         type: msg.image ? 'image' : msg.audio ? 'file' : msg.video ? 'file' : msg.system ? 'system' : 'text',
-        status: msg.pending ? 'sending' : msg.sent ? 'sent' : msg.received ? 'delivered' : 'read',
+        readBy: msg.readBy ?? {},
         metadata: msg.image ? {
           imageUrl: msg.image,
           fileType: 'image'
