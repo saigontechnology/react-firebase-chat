@@ -18,6 +18,10 @@ The `react-firebase-chat` library is designed to:
 - **Provide similar API interface** for easy adoption
 - **Ensure real-time communication** between web and mobile users
 
+### Timestamp behavior
+
+This web library uses client-side timestamps (`Date.now()`) when writing to Firestore for fields like `createdAt`, `updatedAt`, `latestMessageTime`, and `joinedAt`. If you require server-side timestamps for stronger ordering guarantees across clients, you may change these to Firestore `serverTimestamp()` in your app.
+
 ## ✅ Implementation Status
 
 Based on the [Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md), here's the current completion status:
@@ -134,51 +138,80 @@ The library has been tested and verified for seamless communication with React N
 
 ## Installation
 
+### From NPM (Recommended)
 ```bash
 npm install react-firebase-chat firebase
 # or
 yarn add react-firebase-chat firebase
 ```
 
-## 🚀 Quick Start
-
-### Option 1: Simple Chat (No Authentication Required)
-
-Perfect for testing and simple integrations:
-
-```tsx
-import React from 'react';
-import { SimpleChat, SimpleUser } from 'react-firebase-chat';
-
-const MyApp = () => {
-  const currentUser: SimpleUser = {
-    id: 'user-123',
-    name: 'John Doe',
-    avatar: 'https://example.com/avatar.jpg'
-  };
-
-  return (
-    <SimpleChat
-      roomId="my-chat-room"
-      currentUser={currentUser}
-      onSend={(messages) => console.log('Sent:', messages)}
-      placeholder="Type your message..."
-    />
-  );
-};
+### From GitHub
+```bash
+npm install git+https://github.com/your-username/react-firebase-chat.git firebase
+# or
+yarn add git+https://github.com/your-username/react-firebase-chat.git firebase
 ```
 
-### Option 2: Full Featured Chat (With Firebase & Context)
+> **Note**: When installing from GitHub, the package will automatically build the `dist` folder during installation thanks to the `postinstall` script.
 
-For production applications with full cross-platform sync:
+### Importing Styles
 
-## Basic Usage
+The library includes CSS styles that need to be imported for proper styling. You have several options:
+
+#### Option 1: Import All Styles (Recommended)
+```tsx
+import 'react-firebase-chat/styles';
+```
+
+#### Option 2: Import Individual Component Styles
+```tsx
+// Import specific component styles
+import 'react-firebase-chat/dist/components/ChatScreen.css';
+import 'react-firebase-chat/dist/addons/camera/CameraView.css';
+import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
+import 'react-firebase-chat/dist/addons/gallery/GalleryView.css';
+import 'react-firebase-chat/dist/addons/gallery/MediaViewer.css';
+```
+
+#### Option 3: Import in Your CSS File
+```css
+@import 'react-firebase-chat/styles';
+```
+
+### Troubleshooting CSS Issues
+
+If you're experiencing missing styles or CSS not loading:
+
+1. **Make sure you've imported the styles**:
+   ```tsx
+   import 'react-firebase-chat/styles';
+   ```
+
+2. **Check if the dist folder exists** after installation:
+   ```bash
+   ls node_modules/react-firebase-chat/dist/
+   ```
+
+3. **If installing from GitHub and dist folder is missing**, run:
+   ```bash
+   cd node_modules/react-firebase-chat
+   npm run build
+   ```
+
+4. **For individual component styles**, import them directly:
+   ```tsx
+   import 'react-firebase-chat/dist/addons/camera/CameraView.css';
+   import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
+   ```
+
+## 🚀 Quick Start
 
 ### 1. Initialize with ChatProvider
 
 ```tsx
 import React from 'react';
 import { ChatProvider, ChatScreen } from 'react-firebase-chat';
+import 'react-firebase-chat/styles'; // Import styles
 
 const firebaseConfig = {
   apiKey: "your-web-api-key",
@@ -190,7 +223,7 @@ const firebaseConfig = {
 };
 
 const currentUser = {
-  _id: 'web-user-123',
+  id: 'web-user-123',
   name: 'John Doe',
   avatar: 'https://example.com/avatar.jpg'
 };
@@ -200,7 +233,6 @@ function App() {
     <ChatProvider 
       currentUser={currentUser} 
       firebaseConfig={firebaseConfig}
-      encryptionKey="optional-encryption-key"
     >
       <ChatApp />
     </ChatProvider>
@@ -219,10 +251,8 @@ function ChatApp() {
       conversationId="conversation-123"
       memberIds={[partnerInfo.id]} 
       partners={[partnerInfo]}
-      onSend={(messages) => console.log('Messages sent:', messages)}
-      showCamera={true}
-      showFileUpload={true}
-      showGallery={true}
+      showFileUpload
+      showGallery
     />
   );
 }
@@ -230,27 +260,20 @@ function ChatApp() {
 export default App;
 ```
 
-### 2. Advanced Usage with Custom Components
+### 2. Advanced Usage with Hooks
 
 ```tsx
-import { ChatProvider, useChat, useChatContext } from 'react-firebase-chat';
+import { useChat, useChatContext } from 'react-firebase-chat';
 
 const CustomChatApp: React.FC = () => {
   const { currentUser } = useChatContext();
   const { messages, sendMessage, loading } = useChat({
-    userId: currentUser._id.toString(),
+    user: currentUser,
     conversationId: 'conversation-123'
   });
 
   const handleSendMessage = async (text: string) => {
-    await sendMessage({
-      text,
-      user: {
-        _id: currentUser._id,
-        name: currentUser.name,
-        avatar: currentUser.avatar,
-      },
-    });
+    await sendMessage(text);
   };
 
   return (
@@ -259,76 +282,25 @@ const CustomChatApp: React.FC = () => {
     </div>
   );
 };
-  return (
-    <AuthProvider>
-      <ChatProvider>
-        <YourChatComponent />
-      </ChatProvider>
-    </AuthProvider>
-  );
-}
 ```
 
-3. **Use the Chat component:**
-
+3. **Compose with individual components:**
 ```tsx
-import React from 'react';
-import { Chat, useAuthContext } from 'react-firebase-chat';
+import { MessageList, MessageInput, UserAvatar, TypingIndicator } from 'react-firebase-chat';
 
-function ChatRoom() {
-  const { user } = useAuthContext();
-
-  if (!user) {
-    return <div>Please sign in to use chat</div>;
-  }
-
+function CustomChat() {
   return (
-    <div style={{ height: '500px' }}>
-      <Chat
-        roomId="general"
-        currentUser={{
-          uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || 'Anonymous',
-          photoURL: user.photoURL,
-          isOnline: true,
-          lastSeen: new Date(),
-        }}
-      />
+    <div className="chat-container">
+      <MessageList messages={messages} currentUser={currentUser} />
+      <TypingIndicator typingUsers={typingUsers} />
+      <MessageInput onSendMessage={handleSend} />
     </div>
   );
 }
 ```
 
 ## Authentication
-
-The library provides built-in authentication hooks:
-
-```tsx
-import { useAuth } from 'react-firebase-chat';
-
-function LoginForm() {
-  const { signIn, signUp, loading, error } = useAuth();
-
-  const handleSignIn = async (email: string, password: string) => {
-    try {
-      await signIn(email, password);
-    } catch (error) {
-      console.error('Sign in failed:', error);
-    }
-  };
-
-  const handleSignUp = async (email: string, password: string, displayName: string) => {
-    try {
-      await signUp(email, password, displayName);
-    } catch (error) {
-      console.error('Sign up failed:', error);
-    }
-  };
-
-  // Render your login form...
-}
-```
+This library does not include auth utilities. Provide your own auth and pass `currentUser` to `ChatProvider`.
 
 ## Configuration
 
@@ -336,21 +308,197 @@ Configure the chat behavior with the `ChatProvider`:
 
 ```tsx
 <ChatProvider
-  config={{
-    enableTypingIndicator: true,
-    enableReadReceipts: true,
-    maxMessageLength: 500,
-    maxFileSize: 5 * 1024 * 1024, // 5MB
-    theme: 'light'
-  }}
-  events={{
-    onMessageSent: (message) => console.log('Message sent:', message),
-    onError: (error) => console.error('Chat error:', error)
-  }}
+  currentUser={currentUser}
+  firebaseConfig={firebaseConfig}
+  encryptionKey="optional-encryption-key"
 >
   <App />
 </ChatProvider>
 ```
+
+### Available Hooks
+
+```tsx
+import { useChat, useMessages, useTyping, useChatContext } from 'react-firebase-chat';
+
+// Main chat functionality
+const { messages, sendMessage, loading, error } = useChat({
+  user: currentUser,
+  conversationId: 'conversation-123'
+});
+
+// Message pagination
+const { messages, loadMore, hasMore } = useMessages('conversation-123');
+
+// Typing indicators
+const { typingUsers, setTyping } = useTyping('conversation-123', currentUser.id);
+
+// Chat context
+const { currentUser, isInitialized } = useChatContext();
+```
+
+### Direct Service Usage
+
+For advanced use cases, you can use services directly:
+
+```tsx
+import { ChatService, UserService, initializeFirebase } from 'react-firebase-chat';
+
+// Initialize Firebase
+initializeFirebase(firebaseConfig);
+
+// Get service instances
+const chatService = ChatService.getInstance();
+const userService = UserService.getInstance();
+
+// Create users
+await userService.createUserIfNotExists('user1', { name: 'Alice' });
+await userService.createUserIfNotExists('user2', { name: 'Bob' });
+
+// Create conversation
+const conversationId = await chatService.createConversation(
+  ['user1', 'user2'],
+  'user1',
+  'private'
+);
+
+// Send message
+await chatService.sendMessage(conversationId, {
+  text: 'Hello Bob!',
+  type: MediaType.text,
+  senderId: 'user1',
+  readBy: { user1: true },
+  path: '',
+  extension: ''
+});
+
+// Subscribe to real-time messages
+const unsubscribe = chatService.subscribeToMessages(
+  conversationId,
+  (messages) => {
+    console.log('New messages:', messages);
+  }
+);
+```
+
+### Addon Components
+
+The library includes powerful addon components for enhanced functionality:
+
+```tsx
+import { 
+  FileUploader, 
+  CameraView, 
+  GalleryView,
+  useFileUpload,
+  useCamera 
+} from 'react-firebase-chat';
+
+// File Upload
+function FileUploadExample() {
+  const { uploadFile, uploading, progress } = useFileUpload();
+  
+  return (
+    <FileUploader
+      onFileSelect={(files) => console.log('Files selected:', files)}
+      accept="image/*,video/*"
+      multiple
+      maxFiles={5}
+    >
+      <div>Drop files here or click to upload</div>
+    </FileUploader>
+  );
+}
+
+// Camera Integration
+function CameraExample() {
+  const { 
+    isOpen, 
+    openCamera, 
+    closeCamera, 
+    capturePhoto 
+  } = useCamera();
+  
+  return (
+    <div>
+      <button onClick={openCamera}>Open Camera</button>
+      {isOpen && (
+        <CameraView
+          isOpen={isOpen}
+          onClose={closeCamera}
+          onCapture={(blob, type) => {
+            console.log(`${type} captured:`, blob);
+            closeCamera();
+          }}
+          mode="photo"
+        />
+      )}
+    </div>
+  );
+}
+```
+
+## Services
+
+The library provides three main services for advanced functionality:
+
+### ChatService
+Handles all chat operations including conversations, messages, and real-time subscriptions.
+
+```tsx
+import { ChatService } from 'react-firebase-chat';
+
+const chatService = ChatService.getInstance();
+
+// Create conversation
+const conversationId = await chatService.createConversation(
+  ['user1', 'user2'], 
+  'initiatorId', 
+  'private'
+);
+
+// Send message
+await chatService.sendMessage(conversationId, messageData);
+
+// Subscribe to real-time messages
+const unsubscribe = chatService.subscribeToMessages(
+  conversationId, 
+  (messages) => setMessages(messages)
+);
+```
+
+### UserService
+Manages user documents and profiles.
+
+```tsx
+import { UserService } from 'react-firebase-chat';
+
+const userService = UserService.getInstance();
+
+// Create user if not exists
+await userService.createUserIfNotExists('user123', {
+  name: 'John Doe',
+  avatar: 'https://example.com/avatar.jpg'
+});
+
+// Get all users
+const users = await userService.getAllUsers();
+```
+
+### FirebaseService
+Handles Firebase initialization and provides access to Firebase services.
+
+```tsx
+import { initializeFirebase, getFirebaseFirestore } from 'react-firebase-chat';
+
+// Initialize Firebase
+initializeFirebase(firebaseConfig);
+
+// Get Firestore instance
+const db = getFirebaseFirestore();
+```
+
+> 📖 **For detailed service documentation, see [SERVICES.md](./SERVICES.md)**
 
 ## Advanced Usage
 
@@ -360,7 +508,10 @@ Configure the chat behavior with the `ChatProvider`:
 import { useChat } from 'react-firebase-chat';
 
 function CustomChatRoom() {
-  const { messages, sendMessage, loading } = useChat('room-id', 'user-id');
+  const { messages, sendMessage, loading } = useChat({
+    user: currentUser,
+    conversationId: 'conversation-123'
+  });
 
   const handleSendMessage = async (text: string) => {
     await sendMessage(text);
@@ -401,25 +552,30 @@ function TypingExample() {
 
 ## Components
 
-### Chat
+### ChatScreen
 Main chat interface component.
 
 **Props:**
-- `roomId: string` - Unique identifier for the chat room
-- `currentUser: User` - Current authenticated user
-- `config?: Partial<ChatConfig>` - Configuration options
-- `events?: Partial<ChatEvents>` - Event handlers
-- `className?: string` - Additional CSS classes
+- `conversationId: string` - Unique identifier for the conversation
+- `partners: Array<{id: string, name: string, avatar?: string}>` - Array of chat partners
+- `memberIds: string[]` - Array of member user IDs
 - `style?: React.CSSProperties` - Inline styles
+- `className?: string` - Additional CSS classes
+- `onSend?: (messages: Message[]) => void` - Optional callback when messages are sent
+- `showCamera?: boolean` - Enable camera functionality (default: true)
+- `showFileUpload?: boolean` - Enable file upload (default: true)
+- `showGallery?: boolean` - Enable gallery view (default: true)
+- `isGroup?: boolean` - Whether this is a group chat (default: false)
 
 ### MessageList
 Display list of messages.
 
 **Props:**
 - `messages: Message[]` - Array of messages to display
-- `currentUser: User` - Current user for ownership detection
+- `currentUser: IUser` - Current user for ownership detection
 - `onMessageUpdate?: (message: Message) => void` - Message edit handler
 - `onMessageDelete?: (messageId: string) => void` - Message delete handler
+- `className?: string` - Additional CSS classes
 
 ### MessageInput
 Text input for composing messages.
@@ -430,14 +586,30 @@ Text input for composing messages.
 - `disabled?: boolean` - Disable input
 - `placeholder?: string` - Input placeholder text
 - `maxLength?: number` - Maximum message length
+- `className?: string` - Additional CSS classes
 
 ### UserAvatar
 User profile picture with online status.
 
 **Props:**
-- `user: User` - User data
+- `user: IUser` - User data
 - `size?: 'small' | 'medium' | 'large'` - Avatar size
 - `showOnlineStatus?: boolean` - Show online indicator
+- `className?: string` - Additional CSS classes
+
+### ConnectionStatus
+Network connection status indicator.
+
+**Props:**
+- `status: ConnectionStatus` - Connection status ('connected' | 'connecting' | 'disconnected' | 'error')
+- `className?: string` - Additional CSS classes
+
+### TypingIndicator
+Shows when users are typing.
+
+**Props:**
+- `typingUsers: TypingUser[]` - Array of users currently typing
+- `className?: string` - Additional CSS classes
 
 ## Firebase Setup
 
@@ -493,10 +665,15 @@ The library is built with TypeScript and provides full type definitions:
 
 ```tsx
 import type { 
-  User, 
-  Message, 
-  ChatConfig, 
-  ChatEvents 
+  IUser, 
+  IMessage, 
+  IConversation,
+  Message,
+  TypingUser,
+  ConnectionStatus,
+  FirebaseConfig,
+  UseChatProps,
+  UseChatReturn
 } from 'react-firebase-chat';
 ```
 
@@ -514,7 +691,7 @@ MIT © [Your Name]
 
 ## 📚 Documentation
 
-- **[No Authentication Guide](./NO_AUTH_GUIDE.md)** - Quick setup without auth
 - **[Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md)** - Development timeline
 - **[ReactJS Support](./REACTJS_SUPPORT.md)** - Full ReactJS integration guide
+- **[Services Documentation](./SERVICES.md)** - Detailed service API reference
 - **[Examples](./examples/)** - Live code examples

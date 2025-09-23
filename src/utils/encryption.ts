@@ -233,7 +233,7 @@ export const getEncryptionStatus = async (
     isReady,
     keyGenerated,
     testPassed,
-    lastTestedAt: new Date(),
+    lastTestedAt: Date.now(),
   };
 };
 

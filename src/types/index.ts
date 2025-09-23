@@ -4,14 +4,6 @@ import React from 'react';
 // Core Types matching RN-Firebase-Chat
 // ==========================================
 
-// Firebase User type (will be imported when firebase is available)
-export interface FirebaseUser {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-}
-
 // User types matching RN implementation
 export interface IUserInfo {
   id: string;
@@ -21,10 +13,9 @@ export interface IUserInfo {
 
 // IMessage interface compatible with RN app (as per documentation)
 export interface IMessage {
-  _id: string;
+  id: string;
   text?: string;
-  createdAt: Date | number;
-  user: IUser;
+  createdAt: number;
   image?: string;
   video?: string;
   audio?: string;
@@ -32,94 +23,102 @@ export interface IMessage {
   sent?: boolean;
   received?: boolean;
   pending?: boolean;
-  quickReplies?: IQuickReplies;
+  senderId?: string;
+  type?: MediaType;
+  readBy?: Record<string, boolean>;
 }
 
 export interface IUser {
-  _id: string | number;
+  id: string | number;
   name?: string;
   avatar?: string;
-}
-
-export interface IQuickReplies {
-  type: 'radio' | 'checkbox';
-  values: Array<{
-    title: string;
-    value: string;
-  }>;
-  keepIt?: boolean;
 }
 
 // IConversation interface compatible with RN app
 export interface IConversation {
   id: string;
   members: string[];
-  lastMessage?: IMessage;
-  lastMessageTime?: Date;
-  unreadCount?: number;
+  latestMessage?: IMessage;
+  latestMessageTime?: number;
+  unRead?: number;
   title?: string;
   type: 'private' | 'group';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number;
+  updatedAt: number;
 }
 
-// Message types matching RN implementation
-export enum MessageTypes {
+// Message/media type used in Firestore documents
+export enum MediaType {
   text = 'text',
   image = 'image',
+  voice = 'voice',
   video = 'video',
   file = 'file',
   system = 'system'
 }
 
-// Message Props - Core message structure from RN implementation
+// Optional message delivery status in Firestore
+export enum MessageStatus {
+  sent = 'sent',
+  received = 'received',
+  seen = 'seen',
+  failed = 'failed'
+}
+
+// Firestore message document model
 export interface MessageProps {
-  id?: string;
-  text?: string;
+  text: string;
   senderId: string;
-  type: MessageTypes;
+  readBy: Record<string, boolean>;
+  status?: MessageStatus;
+  type?: MediaType;
   path?: string;
   extension?: string;
-  createdAt: Date;
-  updatedAt?: Date;
-  user?: IUserInfo;
+  createdAt: number;
 }
 
 // Send Message Props - for sending new messages
 export interface SendMessageProps {
   text?: string;
   senderId: string;
-  type: MessageTypes;
+  type?: MediaType;
   path?: string;
   extension?: string;
-  createdAt: Date;
+  createdAt: number;
 }
 
-// Latest message props
+// Latest message summary stored inside user conversation summaries
 export interface LatestMessageProps {
+  readBy: Record<string, boolean>;
   senderId: string;
-  senderName: string;
+  name: string;
   text: string;
-  type?: MessageTypes;
+  status?: MessageStatus;
+  type?: MediaType;
   path?: string;
   extension?: string;
-  createdAt: Date;
 }
 
-// Chat room/Conversation types matching RN implementation
+// Conversation document in the main collection (real-time only data)
+export interface ConversationRealtimeProps {
+  id: string;
+  typing: Record<string, boolean>;
+  unRead: Record<string, number>;
+}
+
+// Conversation summary stored per user under /users/{userId}/conversations
 export interface ConversationProps {
   id: string;
   name?: string;
   image?: string;
   members: string[];
-  latestMessage?: LatestMessageProps;
   unRead?: number;
-  updatedAt: Date;
-  createdAt?: Date;
+  updatedAt: number;
+  latestMessage?: LatestMessageProps;
 }
 
 export interface ConversationData {
-  unRead?: Record<string, string>;
+  unRead?: Record<string, number>;
   typing?: Record<string, boolean>;
 }
 
@@ -127,14 +126,15 @@ export interface ConversationData {
 export interface MediaFile {
   id: string;
   path: string;
-  type: MessageTypes;
+  type: MediaType;
 }
 
-// Encryption types matching RN implementation
+// Encryption options used by the library
 export interface EncryptionOptions {
+  salt?: string;
   algorithm?: string;
-  keyLength?: number;
   iterations?: number;
+  keyLength?: number;
 }
 
 export interface EncryptionFunctions {
@@ -148,7 +148,28 @@ export interface EncryptionStatus {
   isReady: boolean;
   keyGenerated: boolean;
   testPassed?: boolean;
-  lastTestedAt?: Date;
+  lastTestedAt?: number; // timestamp in milliseconds
+}
+
+// User profile document stored in /users
+export enum UserStatus {
+  online = 'online',
+  offline = 'offline'
+}
+
+export interface UserProfileProps {
+  id: string; // document ID
+  status: UserStatus;
+  name: string;
+  created?: number;
+  updated?: number;
+  conversations?: FirestoreReference; // CollectionReference<ConversationProps>
+}
+
+export interface CustomConversationInfo {
+  id: string;
+  name?: string;
+  image?: string;
 }
 
 // Firestore collections enum
@@ -174,7 +195,7 @@ export interface User {
   displayName: string;
   photoURL?: string;
   isOnline: boolean;
-  lastSeen: Date;
+  lastSeen: number; // timestamp in milliseconds
   status?: 'online' | 'away' | 'busy' | 'offline';
 }
 
@@ -183,11 +204,10 @@ export interface Message {
   id: string;
   text: string;
   userId: string;
-  user: User;
-  createdAt: Date;
-  updatedAt?: Date;
+  createdAt: number; // timestamp in milliseconds
+  updatedAt?: number; // timestamp in milliseconds
   type: 'text' | 'image' | 'file' | 'system';
-  status: 'sending' | 'sent' | 'delivered' | 'read';
+  readBy: Record<string, boolean>;
   replyTo?: string; // Message ID this is replying to
   metadata?: {
     fileName?: string;
@@ -202,7 +222,7 @@ export interface Message {
 export interface TypingUser {
   uid: string;
   displayName: string;
-  timestamp: Date;
+  timestamp: number; // timestamp in milliseconds
 }
 
 // Chat room interface for ReactJS
@@ -214,9 +234,9 @@ export interface ChatRoom {
   participants: string[]; // User UIDs
   admins: string[]; // User UIDs
   createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
-  lastMessage?: Message;
+  createdAt: number; // timestamp in milliseconds
+  updatedAt: number; // timestamp in milliseconds
+  latestMessage?: Message;
   isPrivate: boolean;
   settings: {
     allowFileSharing: boolean;
@@ -252,7 +272,7 @@ export interface ChatEvents {
   onMessageReceived: (message: Message) => void;
   onMessageUpdated: (message: Message) => void;
   onMessageDeleted: (messageId: string) => void;
-  onUserJoined: (user: User) => void;
+  onUserJoined: (user: IUser) => void;
   onUserLeft: (userId: string) => void;
   onUserTyping: (user: TypingUser) => void;
   onUserStoppedTyping: (userId: string) => void;
@@ -260,17 +280,10 @@ export interface ChatEvents {
   onError: (error: Error) => void;
 }
 
-// Simple user interface for non-authenticated usage
-export interface SimpleUser {
-  id: string;
-  name: string;
-  avatar?: string;
-}
-
 // Component props for ReactJS
 export interface ChatProps {
   roomId: string;
-  currentUser: SimpleUser;
+  currentUser: IUser;
   config?: Partial<ChatConfig>;
   events?: Partial<ChatEvents>;
   className?: string;
@@ -279,7 +292,7 @@ export interface ChatProps {
 
 export interface MessageListProps {
   messages: Message[];
-  currentUser: SimpleUser;
+  currentUser: IUser;
   onMessageUpdate?: (message: Message) => void;
   onMessageDelete?: (messageId: string) => void;
   className?: string;
@@ -295,7 +308,7 @@ export interface MessageInputProps {
 }
 
 export interface UserAvatarProps {
-  user: User;
+  user: IUser;
   size?: 'small' | 'medium' | 'large';
   showOnlineStatus?: boolean;
   className?: string;
@@ -311,22 +324,7 @@ export interface FirebaseConfig {
   appId: string;
 }
 
-// Auth state for ReactJS
-export interface AuthState {
-  user: FirebaseUser | null;
-  loading: boolean;
-  error: string | null;
-}
-
 // Hook return types for ReactJS
-export interface UseAuthReturn extends AuthState {
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updateProfile: (updates: Partial<Pick<User, 'displayName' | 'photoURL'>>) => Promise<void>;
-}
-
 export interface UseChatReturn {
   messages: Message[];
   loading: boolean;

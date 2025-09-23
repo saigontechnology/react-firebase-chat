@@ -78,10 +78,9 @@ rn-firebase-chat-web/
 ```typescript
 // src/types/message.ts - Must match RN app exactly
 export interface IMessage {
-  _id: string;
-  text?: string;
+  id: string;
   createdAt: Date | number;
-  user: IUser;
+  text?: string;
   image?: string;
   video?: string;
   audio?: string;
@@ -89,11 +88,11 @@ export interface IMessage {
   sent?: boolean;
   received?: boolean;
   pending?: boolean;
-  quickReplies?: IQuickReplies;
+  senderId?: string
 }
 
 export interface IUser {
-  _id: string | number;
+  id: string | number;
   name?: string;
   avatar?: string;
 }
@@ -101,10 +100,10 @@ export interface IUser {
 export interface IConversation {
   id: string;
   members: string[];
-  lastMessage?: IMessage;
-  lastMessageTime?: Date;
-  unreadCount?: number;
-  title?: string;
+  latestMessage?: IMessage;
+  latestMessageTime?: Date;
+  unRead?: number;
+  name?: string;
   type: 'private' | 'group';
   createdAt: Date;
   updatedAt: Date;
@@ -231,16 +230,16 @@ export class ChatService {
     memberIds: string[],
     initiatorId: string,
     type: 'private' | 'group' = 'private',
-    title?: string
+    name?: string
   ): Promise<string> {
     const conversationData = {
       members: memberIds,
       type,
-      title: title || '',
+      name: name || '',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      lastMessage: null,
-      lastMessageTime: null,
+      latestMessage: null,
+      latestMessageTime: null,
       createdBy: initiatorId
     };
 
@@ -257,7 +256,7 @@ export class ChatService {
           [`conversations.${docRef.id}`]: {
             conversationId: docRef.id,
             joinedAt: serverTimestamp(),
-            unreadCount: 0
+            unRead: 0
           }
         }
       )
@@ -270,12 +269,12 @@ export class ChatService {
   // Send message (identical to RN app logic)
   async sendMessage(
     conversationId: string,
-    message: Omit<IMessage, '_id' | 'createdAt'>
+    message: Omit<IMessage, 'id' | 'createdAt'>
   ): Promise<void> {
     const messageData = {
       ...message,
       createdAt: serverTimestamp(),
-      _id: undefined // Let Firestore generate the ID
+      id: undefined // Let Firestore generate the ID
     };
 
     // Add message to conversation
@@ -288,8 +287,8 @@ export class ChatService {
     await updateDoc(
       doc(this.firestore, COLLECTIONS.CONVERSATIONS, conversationId),
       {
-        lastMessage: { ...messageData, _id: messageRef.id },
-        lastMessageTime: serverTimestamp(),
+        latestMessage: { ...messageData, id: messageRef.id },
+        latestMessageTime: serverTimestamp(),
         updatedAt: serverTimestamp()
       }
     );
@@ -302,14 +301,14 @@ export class ChatService {
     if (conversationDoc.exists()) {
       const conversation = conversationDoc.data();
       const otherMembers = conversation.members.filter(
-        (memberId: string) => memberId !== message.user._id
+        (memberId: string) => memberId !== message.user.id
       );
 
       const updatePromises = otherMembers.map((memberId: string) =>
         updateDoc(
           doc(this.firestore, COLLECTIONS.USER_CONVERSATIONS, memberId),
           {
-            [`conversations.${conversationId}.unreadCount`]: increment(1)
+            [`conversations.${conversationId}.unRead`]: increment(1)
           }
         )
       );
@@ -335,9 +334,9 @@ export class ChatService {
       snapshot.forEach((doc) => {
         const data = doc.data();
         messages.push({
-          _id: doc.id,
+          id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toDate() || new Date()
+          createdAt: new Date(data.createdAt).valueOf() || Date.now()
         } as IMessage);
       });
       callback(messages.reverse());
@@ -362,9 +361,9 @@ export class ChatService {
         conversations.push({
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-          lastMessageTime: data.lastMessageTime?.toDate() || null
+          createdAt: new Date(data.createdAt).valueOf() || Date.now(),
+          updatedAt: new Date(data.updatedAt).valueOf() || Date.now(),
+          latestMessageTime: new Date(data.latestMessageTime).valueOf() || null
         } as IConversation);
       });
       callback(conversations);
@@ -386,8 +385,10 @@ import { ChatService } from '../services/firebase/chatService';
 import { IMessage, IConversation, IUser } from '../types';
 
 export interface UseChatProps {
-  userId: string;
+  user: IUser;
   conversationId?: string;
+  memberIds?: string[];
+  name?: string
 }
 
 export interface UseChatReturn {
@@ -395,12 +396,12 @@ export interface UseChatReturn {
   conversations: IConversation[];
   loading: boolean;
   error: string | null;
-  sendMessage: (message: Omit<IMessage, '_id' | 'createdAt'>) => Promise<void>;
-  createConversation: (memberIds: string[], type?: 'private' | 'group', title?: string) => Promise<string>;
+  sendMessage: (message: Omit<IMessage, 'id' | 'createdAt'>) => Promise<void>;
+  createConversation: (memberIds: string[], type?: 'private' | 'group', name?: string) => Promise<string>;
   markAsRead: (conversationId: string) => Promise<void>;
 }
 
-export const useChat = ({ userId, conversationId }: UseChatProps): UseChatReturn => {
+export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps): UseChatReturn => {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [conversations, setConversations] = useState<IConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -411,11 +412,11 @@ export const useChat = ({ userId, conversationId }: UseChatProps): UseChatReturn
 
   // Subscribe to conversations
   useEffect(() => {
-    if (!userId) return;
+    if (!user?.id) return;
 
     setLoading(true);
     unsubscribeConversationsRef.current = ChatService.subscribeToConversations(
-      userId,
+      userId: user?.id,
       (newConversations) => {
         setConversations(newConversations);
         setLoading(false);
@@ -427,7 +428,7 @@ export const useChat = ({ userId, conversationId }: UseChatProps): UseChatReturn
         unsubscribeConversationsRef.current();
       }
     };
-  }, [userId]);
+  }, [user?.id]);
 
   // Subscribe to messages for specific conversation
   useEffect(() => {
@@ -448,7 +449,7 @@ export const useChat = ({ userId, conversationId }: UseChatProps): UseChatReturn
     };
   }, [conversationId]);
 
-  const sendMessage = useCallback(async (message: Omit<IMessage, '_id' | 'createdAt'>) => {
+  const sendMessage = useCallback(async (message: Omit<IMessage, 'id' | 'createdAt'>) => {
     if (!conversationId) {
       throw new Error('No conversation selected');
     }
@@ -464,23 +465,23 @@ export const useChat = ({ userId, conversationId }: UseChatProps): UseChatReturn
   const createConversation = useCallback(async (
     memberIds: string[], 
     type: 'private' | 'group' = 'private', 
-    title?: string
+    name?: string
   ) => {
     try {
-      return await ChatService.createConversation(memberIds, userId, type, title);
+      return await ChatService.createConversation(memberIds, user?.id, type, name);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create conversation');
       throw err;
     }
-  }, [userId]);
+  }, [user?.id]);
 
   const markAsRead = useCallback(async (conversationId: string) => {
     try {
-      await ChatService.markConversationAsRead(userId, conversationId);
+      await ChatService.markConversationAsRead(user?.id, conversationId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark as read');
     }
-  }, [userId]);
+  }, [user?.id]);
 
   return {
     messages,
@@ -588,6 +589,7 @@ export interface ChatScreenProps {
   enableGallery?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  isGroup?: boolean
 }
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({
@@ -598,11 +600,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   enableFileUpload = true,
   enableGallery = true,
   className = '',
-  style
+  style,
+  isGroup = false,
 }) => {
   const { currentUser } = useChatContext();
   const { messages, sendMessage, loading, error } = useChat({
-    userId: currentUser._id.toString(),
+    user: currentUser,
     conversationId
   });
 
@@ -612,10 +615,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const handleSend = useCallback(async (messageText: string, messageType: 'text' | 'image' | 'video' | 'file' = 'text') => {
     if (!messageText.trim()) return;
 
-    const message: Omit<IMessage, '_id' | 'createdAt'> = {
+    const message: Omit<IMessage, 'id' | 'createdAt'> = {
       text: messageType === 'text' ? messageText : '',
       user: {
-        _id: currentUser._id,
+        id: currentUser.id,
         name: currentUser.name,
         avatar: currentUser.avatar
       },
@@ -661,14 +664,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             ←
           </button>
         )}
-        <div className="chat-title">
+        <div className="chat-name">
           {partnerUsers.length > 0 ? partnerUsers.map(u => u.name).join(', ') : 'Chat'}
         </div>
       </div>
       
       <MessageList 
         messages={messages} 
-        currentUserId={currentUser._id.toString()} 
+        currentUserId={currentUser.id.toString()} 
       />
       
       <InputToolbar 
@@ -784,7 +787,7 @@ const firebaseConfig = {
 };
 
 const currentUser = {
-  _id: 'web-user-123',
+  id: 'web-user-123',
   name: 'John Doe',
   avatar: 'https://example.com/avatar.jpg'
 };
@@ -816,6 +819,40 @@ function App() {
 export default App;
 ```
 
+## Service Layer Reference
+
+The companion library relies on a service layer equivalent to the web package. For implementation details of message CRUD, subscriptions, typing status, and user management, refer to the shared service API:
+
+- [SERVICES.md](./SERVICES.md)
+
+Typical usage mirrors the examples below:
+
+```tsx
+import { initializeFirebase, ChatService, UserService } from 'react-firebase-chat';
+
+initializeFirebase(firebaseConfig);
+
+const chatService = ChatService.getInstance();
+const userService = UserService.getInstance();
+
+await userService.createUserIfNotExists(currentUser.id.toString(), { name: currentUser.name });
+
+const conversationId = await chatService.createConversation(
+  [currentUser.id.toString(), 'partner-id'],
+  currentUser.id.toString(),
+  'private'
+);
+
+await chatService.sendMessage(conversationId, {
+  text: 'Hello from companion!',
+  type: 'text',
+  senderId: currentUser.id.toString(),
+  readBy: { [currentUser.id.toString()]: true },
+  path: '',
+  extension: ''
+});
+```
+
 ### Advanced Usage with Custom Components
 
 ```tsx
@@ -824,12 +861,12 @@ import { useChat, useChatContext } from 'rn-firebase-chat-web';
 const CustomChatApp: React.FC = () => {
   const { currentUser } = useChatContext();
   const { conversations, createConversation } = useChat({
-    userId: currentUser._id.toString()
+    user: currentUser,
   });
 
   const handleStartNewChat = async (partnerId: string) => {
     try {
-      const conversationId = await createConversation([currentUser._id.toString(), partnerId]);
+      const conversationId = await createConversation([currentUser.id.toString(), partnerId]);
       // Navigate to new conversation
     } catch (error) {
       console.error('Failed to create conversation:', error);
@@ -940,7 +977,6 @@ const CustomFileUploadChat: React.FC = () => {
     try {
       const urls = await Promise.all(files.map(file => uploadFile(file)));
       urls.forEach(url => {
-        // Send file message
         console.log('File uploaded:', url);
       });
     } catch (error) {

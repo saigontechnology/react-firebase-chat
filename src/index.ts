@@ -6,12 +6,10 @@ export * from './types';
 
 // Firebase configuration and services
 export * from './services/firebase';
-export * from './services/auth';
 export * from './services/chat';
+export * from './services/user';
 
 // React components
-export * from './components/Chat';
-export * from './components/SimpleChat';
 export * from './components/ChatScreen';
 export * from './components/MessageList';
 export * from './components/MessageInput';
@@ -20,7 +18,6 @@ export * from './components/TypingIndicator';
 export { ConnectionStatus as ConnectionStatusComponent } from './components/ConnectionStatus';
 
 // Hooks
-export * from './hooks/useAuth';
 export { useChat } from './hooks/useChat';
 export type { UseChatProps } from './hooks/useChat';
 export * from './hooks/useMessages';
@@ -28,7 +25,6 @@ export * from './hooks/useTyping';
 
 // Context providers
 export * from './context/ChatProvider';
-export * from './context/AuthProvider';
 
 // Addons (Web-specific features) - aliased to avoid conflicts
 export {
@@ -80,4 +76,4 @@ export * from './utils/validation';
 export * from './utils/encryption';
 
 // Styles
-import './styles/index.css';
+import './styles.css';

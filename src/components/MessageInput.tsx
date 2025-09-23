@@ -82,7 +82,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [message.length, maxLength]);
 
   return (
-    <div className={`flex items-end space-x-2 p-4 border-t bg-white ${className}`}>
+    <div className={`w-full flex items-stretch space-x-2 bg-white ${className}`}>
       <div className="flex-1 relative">
         <TextareaAutosize
           ref={textareaRef}
@@ -95,7 +95,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           maxRows={5}
           minRows={1}
           className={`
-            w-full px-3 py-2 border border-gray-300 rounded-lg resize-none
+            w-full px-3 py-2 border border-gray-300 rounded-lg resize-none bg-white text-gray-900 placeholder-gray-400
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
             disabled:bg-gray-100 disabled:cursor-not-allowed
             ${message.length >= maxLength * 0.9 ? 'border-orange-300' : ''}
@@ -114,7 +114,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         onClick={handleSend}
         disabled={disabled || !message.trim()}
         className={`
-          px-4 py-2 rounded-lg font-medium transition-colors
+          self-stretch px-4 rounded-lg font-medium transition-colors flex items-center justify-center
           ${disabled || !message.trim()
             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
             : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'

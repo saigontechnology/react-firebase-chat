@@ -1,6 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { User, UserAvatarProps } from '../types';
+import { UserAvatarProps } from '../types';
 
 const sizeClasses = {
   small: 'w-8 h-8 text-xs',
@@ -20,8 +20,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   showOnlineStatus = true,
   className,
 }) => {
-  const initials = user.displayName
-    ? user.displayName
+  const initials = user.name
+    ? user.name
       .split(' ')
       .map(name => name.charAt(0))
       .join('')
@@ -29,7 +29,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       .slice(0, 2)
     : '?';
 
-  const isOnline = user.isOnline && user.status === 'online';
+  const isOnline = true;
 
   return (
     <div className={clsx('relative inline-block', className)}>
@@ -39,10 +39,10 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
           sizeClasses[size]
         )}
       >
-        {user.photoURL ? (
+        {user.avatar ? (
           <img
-            src={user.photoURL}
-            alt={user.displayName}
+            src={user.avatar}
+            alt={user.name}
             className="w-full h-full object-cover"
             onError={(e) => {
               // Fallback to initials if image fails to load

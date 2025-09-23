@@ -1,4 +1,4 @@
-import { MessageTypes, MessageProps, ConversationProps } from '../types';
+import { MediaType, MessageProps, ConversationProps } from '../types';
 
 /**
  * Validation utilities matching RN-Firebase-Chat
@@ -12,13 +12,13 @@ export const validateMessage = (message: Partial<MessageProps>): boolean => {
 
   // Validate based on message type
   switch (message.type) {
-    case MessageTypes.text:
+    case MediaType.text:
       return Boolean(message.text && message.text.trim().length > 0);
-    case MessageTypes.image:
-    case MessageTypes.video:
-    case MessageTypes.file:
+    case MediaType.image:
+    case MediaType.video:
+    case MediaType.file:
       return Boolean(message.path);
-    case MessageTypes.system:
+    case MediaType.system:
       return Boolean(message.text);
     default:
       return false;

@@ -1,4 +1,4 @@
-import { MessageTypes, MessageProps, LatestMessageProps } from '../types';
+import { MediaType, MessageProps, LatestMessageProps } from '../types';
 
 /**
  * Formatting utilities matching RN-Firebase-Chat
@@ -46,20 +46,20 @@ export const formatMessageText = (message: MessageProps): string => {
   if (!message) return '';
 
   switch (message.type) {
-    case MessageTypes.text:
+    case MediaType.text:
       return message.text || '';
 
-    case MessageTypes.image:
+    case MediaType.image:
       return '📷 Image';
 
-    case MessageTypes.video:
+    case MediaType.video:
       return '🎥 Video';
 
-    case MessageTypes.file:
+    case MediaType.file:
       const fileName = message.path?.split('/').pop() || 'File';
       return `📎 ${fileName}`;
 
-    case MessageTypes.system:
+    case MediaType.system:
       return message.text || 'System message';
 
     default:
@@ -67,17 +67,37 @@ export const formatMessageText = (message: MessageProps): string => {
   }
 };
 
+export const convertToLatestMessage = (
+  userId: string,
+  name: string,
+  message: string,
+  type?: MediaType,
+  path?: string,
+  extension?: string
+): LatestMessageProps => ({
+  text: message ?? '',
+  senderId: userId,
+  name: name,
+  readBy: {
+    [userId]: true,
+  },
+  type: type ?? MediaType.text,
+  path: path ?? '',
+  extension: extension ?? '',
+});
+
 // Format latest message for conversation list
 export const formatLatestMessage = (latestMessage: LatestMessageProps): string => {
   if (!latestMessage) return '';
 
-  const senderName = latestMessage.senderName || 'Unknown';
+  const senderName = latestMessage.name || 'Unknown';
   const messageText = formatMessageText({
-    type: latestMessage.type || MessageTypes.text,
+    type: latestMessage.type || MediaType.text,
     text: latestMessage.text,
     path: latestMessage.path,
     senderId: latestMessage.senderId,
-    createdAt: latestMessage.createdAt,
+    createdAt: Date.now(),
+    readBy: latestMessage.readBy,
   });
 
   return `${senderName}: ${messageText}`;

@@ -28,7 +28,7 @@ const CrossPlatformTestExample: React.FC = () => {
   };
 
   const currentUser: IUser = {
-    _id: 'web-test-user',
+    id: 'web-test-user',
     name: 'Web Test User',
     avatar: 'https://example.com/web-user.jpg'
   };

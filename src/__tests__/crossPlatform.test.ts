@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { act } from '@testing-library/react';
 import { ChatService } from '../../src/services/chat';
-import { COLLECTIONS } from '../../src/services/chat';
 import { IMessage, IConversation, IUser } from '../../src/types';
 
 // Mock Firebase for testing
@@ -22,7 +21,7 @@ jest.mock('firebase/firestore', () => ({
   limit: jest.fn(),
   startAfter: jest.fn(),
   onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
+  serverTimestamp: jest.fn(() => Date.now()),
   where: jest.fn(),
   getDocs: jest.fn(),
   getDoc: jest.fn(),
@@ -47,13 +46,13 @@ describe('Cross-platform Communication Tests', () => {
   let mockUnsubscribe: jest.Mock;
 
   const webUser: IUser = {
-    _id: 'web-user-123',
+    id: 'web-user-123',
     name: 'Web User',
     avatar: 'https://example.com/web-user.jpg'
   };
 
   const rnUser: IUser = {
-    _id: 'rn-user-456',
+    id: 'rn-user-456',
     name: 'RN User',
     avatar: 'https://example.com/rn-user.jpg'
   };
@@ -76,9 +75,9 @@ describe('Cross-platform Communication Tests', () => {
     it('should sync messages sent from web to mobile', async () => {
       // Arrange
       const testMessage: IMessage = {
-        _id: 'msg-web-001',
+        id: 'msg-web-001',
         text: 'Hello from web!',
-        createdAt: new Date(),
+        createdAt: Date.now(),
         user: webUser,
         sent: true,
         received: false,
@@ -91,7 +90,7 @@ describe('Cross-platform Communication Tests', () => {
         setTimeout(() => {
           callback({
             docs: [{
-              id: testMessage._id,
+              id: testMessage.id,
               data: () => ({
                 text: testMessage.text,
                 createdAt: { toDate: () => testMessage.createdAt },
@@ -120,16 +119,16 @@ describe('Cross-platform Communication Tests', () => {
       // Assert
       expect(messages).toHaveLength(1);
       expect(messages[0].text).toBe('Hello from web!');
-      expect(messages[0].user._id).toBe(webUser._id);
+      expect(messages[0].user.id).toBe(webUser.id);
       expect(onSnapshot).toHaveBeenCalled();
     });
 
     it('should sync messages sent from mobile to web', async () => {
       // Arrange
       const testMessage: IMessage = {
-        _id: 'msg-rn-001',
+        id: 'msg-rn-001',
         text: 'Hello from React Native!',
-        createdAt: new Date(),
+        createdAt: Date.now(),
         user: rnUser,
         sent: true,
         received: true,
@@ -142,7 +141,7 @@ describe('Cross-platform Communication Tests', () => {
         setTimeout(() => {
           callback({
             docs: [{
-              id: testMessage._id,
+              id: testMessage.id,
               data: () => ({
                 text: testMessage.text,
                 createdAt: { toDate: () => testMessage.createdAt },
@@ -170,7 +169,7 @@ describe('Cross-platform Communication Tests', () => {
       // Assert
       expect(messages).toHaveLength(1);
       expect(messages[0].text).toBe('Hello from React Native!');
-      expect(messages[0].user._id).toBe(rnUser._id);
+      expect(messages[0].user.id).toBe(rnUser.id);
       expect(messages[0].sent).toBe(true);
       expect(messages[0].received).toBe(true);
     });
@@ -179,21 +178,21 @@ describe('Cross-platform Communication Tests', () => {
       // Arrange
       const messages = [
         {
-          _id: 'msg-001',
+          id: 'msg-001',
           text: 'First message',
-          createdAt: new Date('2024-01-01T10:00:00Z'),
+          createdAt: new Date('2024-01-01T10:00:00Z').valueOf(),
           user: webUser
         },
         {
-          _id: 'msg-002', 
+          id: 'msg-002', 
           text: 'Second message',
-          createdAt: new Date('2024-01-01T10:01:00Z'),
+          createdAt: new Date('2024-01-01T10:01:00Z').valueOf(),
           user: rnUser
         },
         {
-          _id: 'msg-003',
+          id: 'msg-003',
           text: 'Third message',
-          createdAt: new Date('2024-01-01T10:02:00Z'),
+          createdAt: new Date('2024-01-01T10:02:00Z').valueOf(),
           user: webUser
         }
       ];
@@ -203,7 +202,7 @@ describe('Cross-platform Communication Tests', () => {
         setTimeout(() => {
           callback({
             docs: messages.map(msg => ({
-              id: msg._id,
+              id: msg.id,
               data: () => ({
                 text: msg.text,
                 createdAt: { toDate: () => msg.createdAt },
@@ -237,10 +236,10 @@ describe('Cross-platform Communication Tests', () => {
     it('should handle image messages from RN app', async () => {
       // Arrange
       const imageMessage: IMessage = {
-        _id: 'msg-img-001',
+        id: 'msg-img-001',
         text: '',
         image: 'https://storage.googleapis.com/test-bucket/images/photo.jpg',
-        createdAt: new Date(),
+        createdAt: Date.now(),
         user: rnUser
       };
 
@@ -249,7 +248,7 @@ describe('Cross-platform Communication Tests', () => {
         setTimeout(() => {
           callback({
             docs: [{
-              id: imageMessage._id,
+              id: imageMessage.id,
               data: () => ({
                 text: imageMessage.text,
                 image: imageMessage.image,
@@ -276,16 +275,16 @@ describe('Cross-platform Communication Tests', () => {
       expect(messages).toHaveLength(1);
       expect(messages[0].image).toBe(imageMessage.image);
       expect(messages[0].text).toBe('');
-      expect(messages[0].user._id).toBe(rnUser._id);
+      expect(messages[0].user.id).toBe(rnUser.id);
     });
 
     it('should handle video messages from RN app', async () => {
       // Arrange
       const videoMessage: IMessage = {
-        _id: 'msg-video-001',
+        id: 'msg-video-001',
         text: '',
         video: 'https://storage.googleapis.com/test-bucket/videos/video.mp4',
-        createdAt: new Date(),
+        createdAt: Date.now(),
         user: rnUser
       };
 
@@ -294,7 +293,7 @@ describe('Cross-platform Communication Tests', () => {
         setTimeout(() => {
           callback({
             docs: [{
-              id: videoMessage._id,
+              id: videoMessage.id,
               data: () => ({
                 text: videoMessage.text,
                 video: videoMessage.video,
@@ -320,7 +319,7 @@ describe('Cross-platform Communication Tests', () => {
       // Assert
       expect(messages).toHaveLength(1);
       expect(messages[0].video).toBe(videoMessage.video);
-      expect(messages[0].user._id).toBe(rnUser._id);
+      expect(messages[0].user.id).toBe(rnUser.id);
     });
   });
 
@@ -333,8 +332,8 @@ describe('Cross-platform Communication Tests', () => {
 
       // Act
       const conversationId = await chatService.createConversation(
-        [webUser._id.toString(), rnUser._id.toString()],
-        webUser._id.toString(),
+        [webUser.id.toString(), rnUser.id.toString()],
+        webUser.id.toString(),
         'private'
       );
 
@@ -356,9 +355,9 @@ describe('Cross-platform Communication Tests', () => {
       // Arrange
       const startTime = Date.now();
       const testMessage: IMessage = {
-        _id: 'perf-msg-001',
+        id: 'perf-msg-001',
         text: 'Performance test message',
-        createdAt: new Date(),
+        createdAt: Date.now(),
         user: webUser
       };
 
@@ -368,7 +367,7 @@ describe('Cross-platform Communication Tests', () => {
         setTimeout(() => {
           callback({
             docs: [{
-              id: testMessage._id,
+              id: testMessage.id,
               data: () => ({
                 text: testMessage.text,
                 createdAt: { toDate: () => testMessage.createdAt },
@@ -403,7 +402,7 @@ describe('Cross-platform Communication Tests', () => {
         id: `msg-${i}`,
         data: () => ({
           text: `Message ${i}`,
-          createdAt: { toDate: () => new Date() },
+          createdAt: { toDate: () => Date.now() },
           user: i % 2 === 0 ? webUser : rnUser
         })
       }));
