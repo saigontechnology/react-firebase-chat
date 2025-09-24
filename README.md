@@ -26,16 +26,16 @@ This web library uses client-side timestamps (`Date.now()`) when writing to Fire
 
 ### From NPM (Recommended)
 ```bash
-npm install react-firebase-chat firebase tailwindcss framer-motion
+npm install @saigontechnology/react-firebase-chat firebase tailwindcss framer-motion
 # or
-yarn add react-firebase-chat firebase tailwindcss framer-motion
+yarn add @saigontechnology/react-firebase-chat firebase tailwindcss framer-motion
 ```
 
 ### From GitHub
 ```bash
-npm install git+https://github.com/your-username/react-firebase-chat.git firebase tailwindcss framer-motion
+npm install git+https://github.com/saigontechnology/react-firebase-chat.git firebase tailwindcss framer-motion
 # or
-yarn add git+https://github.com/your-username/react-firebase-chat.git firebase tailwindcss framer-motion
+yarn add git+https://github.com/saigontechnology/react-firebase-chat.git firebase tailwindcss framer-motion
 ```
 
 > **Note**: When installing from GitHub, the package will automatically build the `dist` folder during installation thanks to the `postinstall` script.

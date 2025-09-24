@@ -6,8 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { act } from '@testing-library/react';
-import { ChatService } from '../../src/services/chat';
-import { IMessage, IConversation, IUser } from '../../src/types';
+import { ChatService } from '../services/chat';
+import { IMessage, IConversation, IUser } from '../types';
 
 // Mock Firebase for testing
 jest.mock('firebase/firestore', () => ({

@@ -1,0 +1,54 @@
+# Source files
+src/
+examples/
+
+# Development files
+.eslintrc*
+.prettierrc*
+jest.config.js
+.storybook/
+.github/
+.vscode/
+.idea/
+
+# Tests
+**/*.test.ts
+**/*.test.tsx
+**/__tests__/
+**/test/
+
+# Development scripts
+deploy.sh
+
+# Documentation (keep README.md)
+SERVICES.md
+RELEASE.md
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build artifacts that shouldn't be in npm
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Lock files (let users choose their package manager)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

@@ -30,6 +30,9 @@
     "dist",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "**/*.stories.tsx"
+    "**/*.stories.tsx",
+    "examples",
+    "jest.config.js",
+    "deploy.sh"
   ]
 }

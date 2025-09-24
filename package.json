@@ -1,5 +1,5 @@
 {
-  "name": "react-firebase-chat",
+  "name": "@saigontechnology/react-firebase-chat",
   "version": "1.0.0",
   "description": "A comprehensive ReactJS Firebase Chat library with real-time messaging, user authentication, and modern UI components",
   "main": "dist/index.js",
@@ -8,21 +8,22 @@
   "exports": {
     ".": {
       "import": "./dist/index.js",
+      "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./styles": {
-      "import": "./dist/styles.css"
-    }
+    "./styles": "./dist/styles.css",
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist",
-    "src",
-    "postcss.config.js",
-    "tailwind.config.js"
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc && npm run build:css",
+    "build": "npm run clean && tsc && npm run build:css",
     "build:css": "postcss src/styles.css -d dist && postcss src/components/*.css -d dist/components && postcss src/addons/*/*.css -d dist/addons --base src/addons && postcss src/styles/index.css -d dist/styles",
+    "clean": "rm -rf dist",
     "dev": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -31,8 +32,15 @@
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook",
     "prepare": "npm run build",
-    "postinstall": "npm run build",
-    "release": "npm run build && npm publish --access public"
+    "prepublishOnly": "npm run build",
+    "preversion": "npm run lint",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags",
+    "release:patch": "npm version patch && npm publish",
+    "release:minor": "npm version minor && npm publish",
+    "release:major": "npm version major && npm publish",
+    "release:beta": "npm version prerelease --preid=beta && npm publish --tag beta",
+    "dry-run": "npm publish --dry-run"
   },
   "keywords": [
     "react",
@@ -41,10 +49,26 @@
     "realtime",
     "messaging",
     "typescript",
-    "ui-components"
+    "ui-components",
+    "react-component",
+    "firebase-chat",
+    "real-time-chat",
+    "chat-application"
   ],
-  "author": "Your Name",
+  "author": "SaiGon Technology <info@saigontechnology.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saigontechnology/react-firebase-chat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saigontechnology/react-firebase-chat/issues"
+  },
+  "homepage": "https://github.com/saigontechnology/react-firebase-chat#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "peerDependencies": {
     "react": "^18.3.1",
     "react-dom": ">=16.8.0"
@@ -61,6 +85,7 @@
     "@storybook/addon-essentials": "^7.6.4",
     "@storybook/react": "^7.6.4",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^14.3.1",
     "@types/jest": "^29.5.8",
     "@types/react": "^18.3.23",
@@ -71,9 +96,11 @@
     "eslint": "^8.54.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
     "firebase": "^10.14.1",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.32",
     "postcss-cli": "^11.0.0",
     "tailwindcss": "^3.3.6",
