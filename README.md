@@ -140,71 +140,54 @@ The library has been tested and verified for seamless communication with React N
 
 ### From NPM (Recommended)
 ```bash
-npm install react-firebase-chat firebase
+npm install react-firebase-chat firebase tailwindcss framer-motion
 # or
-yarn add react-firebase-chat firebase
+yarn add react-firebase-chat firebase tailwindcss framer-motion
 ```
 
 ### From GitHub
 ```bash
-npm install git+https://github.com/your-username/react-firebase-chat.git firebase
+npm install git+https://github.com/your-username/react-firebase-chat.git firebase tailwindcss framer-motion
 # or
-yarn add git+https://github.com/your-username/react-firebase-chat.git firebase
+yarn add git+https://github.com/your-username/react-firebase-chat.git firebase tailwindcss framer-motion
 ```
 
 > **Note**: When installing from GitHub, the package will automatically build the `dist` folder during installation thanks to the `postinstall` script.
 
-### Importing Styles
-
-The library includes CSS styles that need to be imported for proper styling. You have several options:
-
-#### Option 1: Import All Styles (Recommended)
-```tsx
-import 'react-firebase-chat/styles';
+### Installing Dev Dependencies
+```bash
+npm install --save-dev autoprefixer postcss postcss-cli
+# or
+yarn add autoprefixer postcss postcss-cli --dev
 ```
 
-#### Option 2: Import Individual Component Styles
-```tsx
-// Import specific component styles
-import 'react-firebase-chat/dist/components/ChatScreen.css';
-import 'react-firebase-chat/dist/addons/camera/CameraView.css';
-import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
-import 'react-firebase-chat/dist/addons/gallery/GalleryView.css';
-import 'react-firebase-chat/dist/addons/gallery/MediaViewer.css';
-```
-
-#### Option 3: Import in Your CSS File
-```css
-@import 'react-firebase-chat/styles';
-```
-
-### Troubleshooting CSS Issues
-
-If you're experiencing missing styles or CSS not loading:
-
-1. **Make sure you've imported the styles**:
-   ```tsx
-   import 'react-firebase-chat/styles';
-   ```
-
-2. **Check if the dist folder exists** after installation:
-   ```bash
-   ls node_modules/react-firebase-chat/dist/
-   ```
-
-3. **If installing from GitHub and dist folder is missing**, run:
-   ```bash
-   cd node_modules/react-firebase-chat
-   npm run build
-   ```
-
-4. **For individual component styles**, import them directly:
-   ```tsx
-   import 'react-firebase-chat/dist/addons/camera/CameraView.css';
-   import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
-   ```
+> **Note**: Our package is built with tailwindcss so if you did not init the project with it, you will have to configure for it before using this package.
 
 ## 🚀 Quick Start
+
+### Theme Notice
+Add Material Icons on root head tag
+```html
+  <html lang="en">
+    <head>
+      {/* Add Material Icons */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossOrigin="anonymous"
+      />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+        rel="stylesheet"
+      />
+      {/* Add Material Icons */}
+    </head>
+    <body>
+      {children}
+    </body>
+  </html>
+```
 
 ### 1. Initialize with ChatProvider
 
@@ -248,7 +231,6 @@ function ChatApp() {
       conversationId="conversation-123" // optional preselected id
       memberIds={[]} // optional when using sidebar-driven selection
       showFileUpload
-      showGallery
     />
   );
 }
@@ -256,44 +238,7 @@ function ChatApp() {
 export default App;
 ```
 
-### 2. Advanced Usage with Hooks
-
-```tsx
-import { useChat, useChatContext } from 'react-firebase-chat';
-
-const CustomChatApp: React.FC = () => {
-  const { currentUser } = useChatContext();
-  const { messages, sendMessage, loading } = useChat({
-    user: currentUser,
-    conversationId: 'conversation-123'
-  });
-
-  const handleSendMessage = async (text: string) => {
-    await sendMessage(text);
-  };
-
-  return (
-    <div className="custom-chat">
-      {/* Your custom UI implementation */}
-    </div>
-  );
-};
-```
-
-3. **Compose with individual components:**
-```tsx
-import { MessageList, MessageInput, UserAvatar, TypingIndicator } from 'react-firebase-chat';
-
-function CustomChat() {
-  return (
-    <div className="chat-container">
-      <MessageList messages={messages} currentUser={currentUser} />
-      <TypingIndicator typingUsers={typingUsers} />
-      <MessageInput onSendMessage={handleSend} />
-    </div>
-  );
-}
-```
+OR Getting started using our [Basic Usage](./examples/basic-usage.tsx)
 
 ## Authentication
 This library does not include auth utilities. Provide your own auth and pass `currentUser` to `ChatProvider`.
@@ -377,63 +322,6 @@ const unsubscribe = chatService.subscribeToMessages(
 );
 ```
 
-### Addon Components
-
-The library includes powerful addon components for enhanced functionality:
-
-```tsx
-import { 
-  FileUploader, 
-  CameraView, 
-  GalleryView,
-  useFileUpload,
-  useCamera 
-} from 'react-firebase-chat';
-
-// File Upload
-function FileUploadExample() {
-  const { uploadFile, uploading, progress } = useFileUpload();
-  
-  return (
-    <FileUploader
-      onFileSelect={(files) => console.log('Files selected:', files)}
-      accept="image/*,video/*"
-      multiple
-      maxFiles={5}
-    >
-      <div>Drop files here or click to upload</div>
-    </FileUploader>
-  );
-}
-
-// Camera Integration
-function CameraExample() {
-  const { 
-    isOpen, 
-    openCamera, 
-    closeCamera, 
-    capturePhoto 
-  } = useCamera();
-  
-  return (
-    <div>
-      <button onClick={openCamera}>Open Camera</button>
-      {isOpen && (
-        <CameraView
-          isOpen={isOpen}
-          onClose={closeCamera}
-          onCapture={(blob, type) => {
-            console.log(`${type} captured:`, blob);
-            closeCamera();
-          }}
-          mode="photo"
-        />
-      )}
-    </div>
-  );
-}
-```
-
 ## Services
 
 The library provides three main services for advanced functionality:
@@ -496,56 +384,6 @@ const db = getFirebaseFirestore();
 
 > 📖 **For detailed service documentation, see [SERVICES.md](./SERVICES.md)**
 
-## Advanced Usage
-
-### Custom Message Handling
-
-```tsx
-import { useChat } from 'react-firebase-chat';
-
-function CustomChatRoom() {
-  const { messages, sendMessage, loading } = useChat({
-    user: currentUser,
-    conversationId: 'conversation-123'
-  });
-
-  const handleSendMessage = async (text: string) => {
-    await sendMessage(text);
-    // Custom logic after sending
-  };
-
-  return (
-    <div>
-      {messages.map(message => (
-        <div key={message.id}>{message.text}</div>
-      ))}
-    </div>
-  );
-}
-```
-
-### Typing Indicators
-
-```tsx
-import { useTyping } from 'react-firebase-chat';
-
-function TypingExample() {
-  const { typingUsers, setTyping } = useTyping('room-id', 'user-id');
-
-  const handleInputChange = (value: string) => {
-    setTyping(value.length > 0);
-  };
-
-  return (
-    <div>
-      {typingUsers.length > 0 && (
-        <div>{typingUsers.map(u => u.displayName).join(', ')} typing...</div>
-      )}
-    </div>
-  );
-}
-```
-
 ## Components
 
 ### ChatScreen
@@ -560,7 +398,6 @@ Main chat interface component with three sections: app header, conversation side
 - `onSend?: (messages: Message[]) => void` - Optional callback when messages are sent
 - `showCamera?: boolean` - Enable camera functionality (default: true)
 - `showFileUpload?: boolean` - Enable file upload (default: true)
-- `showGallery?: boolean` - Enable gallery view (default: true)
 - `isGroup?: boolean` - Whether this is a group chat (default: false)
 
 Sidebar behavior:

@@ -41,7 +41,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   renderChatList,
   renderChatNewModal,
 }) => {
-  const { currentUser, isInitialized } = useChatContext();
+  const { currentUser } = useChatContext();
   const [showUploader, setShowUploader] = useState(false);
 
   const chatNewModalRef = useRef<ChatNewModalRef>(null);
@@ -128,8 +128,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     async (text: string) => {
       if (!text.trim()) return;
       await handleSendMessage(text);
+      markAsRead();
     },
-    [handleSendMessage]
+    [handleSendMessage, markAsRead]
   );
 
   const startChatWithUser = useCallback(
@@ -182,17 +183,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     },
     []
   );
-
-  if (!isInitialized) {
-    return (
-      <div className={`chat-screen loading ${className}`} style={style}>
-        <div className="loading-indicator">
-          <div className="spinner" />
-          <p>Initializing chat...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Do not block the whole screen while loading a conversation
 

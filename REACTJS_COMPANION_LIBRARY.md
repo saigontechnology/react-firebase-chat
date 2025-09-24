@@ -575,7 +575,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   });
 
   const [showCamera, setShowCamera] = useState(false);
-  const [showGallery, setShowGallery] = useState(false);
 
   const handleSend = useCallback(async (messageText: string, messageType: 'text' | 'image' | 'video' | 'file' = 'text') => {
     if (!messageText.trim()) return;
@@ -643,7 +642,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         onSend={handleSend}
         placeholder="Type a message..."
         onPressCamera={enableCamera ? () => setShowCamera(true) : undefined}
-        onPressGallery={enableGallery ? () => setShowGallery(true) : undefined}
         fileUploadEnabled={enableFileUpload}
         onFileUpload={handleFileUpload}
       />
@@ -652,16 +650,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         <CameraView
           onSend={handleCameraCapture}
           onClose={() => setShowCamera(false)}
-        />
-      )}
-
-      {showGallery && (
-        <GalleryView
-          items={[]} // Pass media items from messages
-          onSelect={(item) => {
-            // Handle gallery item selection
-          }}
-          onClose={() => setShowGallery(false)}
         />
       )}
     </div>

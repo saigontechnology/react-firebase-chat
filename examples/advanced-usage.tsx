@@ -56,7 +56,6 @@ const AdvancedChatApp: React.FC<{
   const { currentUser } = useChatContext();
   const [showCamera, setShowCamera] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
-  const [showGallery, setShowGallery] = useState(false);
 
   const partnerInfo = {
     id: 'advanced-partner-789',
@@ -82,8 +81,6 @@ const AdvancedChatApp: React.FC<{
           setShowCamera={setShowCamera}
           showFileUpload={showFileUpload}
           setShowFileUpload={setShowFileUpload}
-          showGallery={showGallery}
-          setShowGallery={setShowGallery}
         />
       </div>
 
@@ -96,7 +93,6 @@ const AdvancedChatApp: React.FC<{
           onSend={(messages) => console.log('Advanced messages sent:', messages)}
           showCamera={false} // We'll use the sidebar camera
           showFileUpload={false} // We'll use the sidebar uploader
-          showGallery={false} // We'll use the sidebar gallery
           style={{ flex: 1 }}
         />
       </div>
@@ -109,11 +105,6 @@ const AdvancedChatApp: React.FC<{
       {/* File upload modal */}
       {showFileUpload && (
         <FileUploadModal onClose={() => setShowFileUpload(false)} />
-      )}
-
-      {/* Gallery modal */}
-      {showGallery && (
-        <GalleryModal onClose={() => setShowGallery(false)} />
       )}
     </div>
   );
@@ -179,15 +170,11 @@ const AddonSidebar: React.FC<{
   setShowCamera: (show: boolean) => void;
   showFileUpload: boolean;
   setShowFileUpload: (show: boolean) => void;
-  showGallery: boolean;
-  setShowGallery: (show: boolean) => void;
 }> = ({
   showCamera,
   setShowCamera,
   showFileUpload,
   setShowFileUpload,
-  showGallery,
-  setShowGallery
 }) => {
   const addonButtons = [
     {
@@ -202,12 +189,6 @@ const AddonSidebar: React.FC<{
       action: () => setShowFileUpload(!showFileUpload),
       active: showFileUpload
     },
-    {
-      icon: '🖼️',
-      label: 'Gallery',
-      action: () => setShowGallery(!showGallery),
-      active: showGallery
-    }
   ];
 
   return (
