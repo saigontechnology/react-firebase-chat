@@ -123,9 +123,9 @@ The library has been tested and verified for seamless communication with React N
 - 📱 **Cross-Platform Sync** - Messages sync between web and mobile instantly
 - 🔐 **Data Compatibility** - Identical data structures as React Native app
 - ⌨️ **Typing Indicators** - Real-time typing status across platforms
-- � **Media Sharing** - Images, videos, and file uploads
+- 📎 **Media Sharing** - Images, videos, and file uploads
 - 🎨 **Customizable UI** - Modern, responsive design
-- � **Encryption Support** - Optional message encryption
+- 🔐 **Encryption Support** - Optional message encryption
 - 📊 **Message Status** - Delivery and read receipts
 - 🌙 **Theme Support** - Light, dark, and auto themes
 - 🔍 **TypeScript** - Full type safety with RN compatibility
@@ -133,7 +133,7 @@ The library has been tested and verified for seamless communication with React N
 ### Web-Specific Addons
 - 📷 **Camera Integration** - Web Camera API for photo/video capture
 - 📁 **File Upload** - Drag & drop file uploading
-- �️ **Gallery View** - Media file gallery and viewer
+- 🖼️ **Gallery View** - Media file gallery and viewer
 - 🎵 **Audio Recording** - Web audio recording capabilities
 
 ## Installation
@@ -240,17 +240,13 @@ function App() {
 }
 
 function ChatApp() {
-  const partnerInfo = {
-    id: 'partner-123',
-    name: 'Jane Smith',
-    avatar: 'https://example.com/jane.jpg',
-  };
-
+  // ChatScreen now includes a built-in header (logo, profile, logout)
+  // and a left sidebar listing conversations. Passing conversationId is
+  // optional; when omitted the first conversation is selected.
   return (
     <ChatScreen 
-      conversationId="conversation-123"
-      memberIds={[partnerInfo.id]} 
-      partners={[partnerInfo]}
+      conversationId="conversation-123" // optional preselected id
+      memberIds={[]} // optional when using sidebar-driven selection
       showFileUpload
       showGallery
     />
@@ -553,12 +549,12 @@ function TypingExample() {
 ## Components
 
 ### ChatScreen
-Main chat interface component.
+Main chat interface component with three sections: app header, conversation sidebar, and chat panel. Selecting a conversation shows a loader only in the chat panel, not the whole screen.
 
 **Props:**
-- `conversationId: string` - Unique identifier for the conversation
-- `partners: Array<{id: string, name: string, avatar?: string}>` - Array of chat partners
-- `memberIds: string[]` - Array of member user IDs
+- `conversationId?: string` - Optional preselected conversation id
+- `partners?: Array<{id: string, name: string, avatar?: string}>` - Optional partners (for direct usage without sidebar)
+- `memberIds: string[]` - Member user IDs (optional when using sidebar-driven conversations)
 - `style?: React.CSSProperties` - Inline styles
 - `className?: string` - Additional CSS classes
 - `onSend?: (messages: Message[]) => void` - Optional callback when messages are sent
@@ -566,6 +562,10 @@ Main chat interface component.
 - `showFileUpload?: boolean` - Enable file upload (default: true)
 - `showGallery?: boolean` - Enable gallery view (default: true)
 - `isGroup?: boolean` - Whether this is a group chat (default: false)
+
+Sidebar behavior:
+- Lists conversations from `users/{userId}/conversations` with name, latest message, unread badge and online dot placeholder
+- “New” button opens a modal with incremental search (top 3 matches from `UserService` after typing). Selecting a user creates a new conversation and opens it.
 
 ### MessageList
 Display list of messages.
@@ -580,12 +580,13 @@ Display list of messages.
 ### MessageInput
 Text input for composing messages.
 
+The input now relies on its container for styling and no longer enforces `maxLength` internally.
+
 **Props:**
 - `onSendMessage: (text: string) => void` - Send message handler
 - `onTyping?: (isTyping: boolean) => void` - Typing indicator handler
 - `disabled?: boolean` - Disable input
 - `placeholder?: string` - Input placeholder text
-- `maxLength?: number` - Maximum message length
 - `className?: string` - Additional CSS classes
 
 ### UserAvatar

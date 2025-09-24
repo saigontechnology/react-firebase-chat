@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatDistanceToNow, format } from "date-fns";
-import { UserAvatar } from "./UserAvatar";
+import { format } from "date-fns";
 import { Message, MessageListProps } from "../types";
 
 interface MessageItemProps {

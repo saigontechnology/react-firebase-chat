@@ -99,17 +99,6 @@ const conversationId = await chatService.createConversation(
 );
 ```
 
-#### `getOrCreateConversation(conversationId: string, memberIds: string[], initiatorId: string, type?: 'private' | 'group', name?: string): Promise<string>`
-Gets an existing conversation or creates a new one if it doesn't exist.
-
-```typescript
-const conversationId = await chatService.getOrCreateConversation(
-  'existing-conversation-id',
-  ['user1', 'user2'],
-  'initiatorId'
-);
-```
-
 #### `sendMessage(conversationId: string, message: Omit<IMessage, 'id' | 'createdAt' | 'user'>, conversationOptions?: object): Promise<void>`
 Sends a message to a conversation.
 
@@ -156,18 +145,6 @@ const unsubscribe = chatService.subscribeToMessages(
 unsubscribe();
 ```
 
-#### `subscribeToConversations(userId: string, callback: (conversations: IConversation[]) => void): () => void`
-Subscribes to user's conversations.
-
-```typescript
-const unsubscribe = chatService.subscribeToConversations(
-  'user123',
-  (conversations) => {
-    console.log('User conversations:', conversations);
-  }
-);
-```
-
 #### `subscribeToUserConversations(userId: string, callback: (userConversations: any[]) => void): () => void`
 Subscribes to user's conversation summaries.
 
@@ -199,11 +176,11 @@ const unsubscribe = chatService.subscribeToTypingStatus(
 );
 ```
 
-#### `updateunRead(conversationId: string, userId: string, count: number): Promise<void>`
+#### `updateUnread(conversationId: string, userId: string, count: number): Promise<void>`
 Updates unread message count for a user.
 
 ```typescript
-await chatService.updateunRead(conversationId, 'user123', 5);
+await chatService.updateUnread(conversationId, 'user123', 5);
 ```
 
 #### `uploadFile(file: File, conversationId: string): Promise<{path: string; downloadURL: string}>`
@@ -219,15 +196,6 @@ Deletes a message.
 
 ```typescript
 await chatService.deleteMessage(conversationId, 'message123');
-```
-
-#### `updateMessage(conversationId: string, messageId: string, updates: Partial<MessageProps>): Promise<void>`
-Updates a message.
-
-```typescript
-await chatService.updateMessage(conversationId, 'message123', {
-  text: 'Updated message text'
-});
 ```
 
 #### `getMessagesWithPagination(conversationId: string, limitCount?: number, latestMessageDoc?: DocumentSnapshot): Promise<IMessage[]>`

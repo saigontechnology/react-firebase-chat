@@ -29,7 +29,7 @@ export interface IMessage {
 }
 
 export interface IUser {
-  id: string | number;
+  id: string;
   name?: string;
   avatar?: string;
 }
@@ -303,7 +303,6 @@ export interface MessageInputProps {
   onTyping?: (isTyping: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
-  maxLength?: number;
   className?: string;
 }
 
@@ -331,8 +330,7 @@ export interface UseChatReturn {
   error: string | null;
   sendMessage: (text: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
-  updateMessage: (messageId: string, text: string) => Promise<void>;
-  markAsRead: (messageId: string) => Promise<void>;
+  markAsRead: () => Promise<void>;
 }
 
 export interface UseMessagesReturn {

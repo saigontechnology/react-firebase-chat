@@ -59,29 +59,19 @@ export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): 
     }
   }, [conversationId, chatService]);
 
-  // Update a message
-  const updateMessage = useCallback(async (messageId: string, text: string) => {
+  // Mark message as read
+  const markAsRead = useCallback(async () => {
     try {
       if (!conversationId) {
-        throw new Error('No conversation selected');
+        console.log('No conversation selected');
+        return;
       }
-      await chatService.updateMessage(conversationId, messageId, {text});
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update message');
-      throw err;
-    }
-  }, [conversationId, chatService]);
-
-  // Mark message as read
-  const markAsRead = useCallback(async (messageId: string) => {
-    try {
-      // Implementation would mark the message as read
-      console.log('Marking message as read:', messageId);
+      await chatService.updateUnread(conversationId, user.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark as read');
       throw err;
     }
-  }, []);
+  }, [conversationId, user.id]);
 
   // Subscribe to messages
   useEffect(() => {
@@ -123,7 +113,6 @@ export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): 
     error,
     sendMessage,
     deleteMessage,
-    updateMessage,
     markAsRead,
   };
 };

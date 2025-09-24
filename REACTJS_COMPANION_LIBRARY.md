@@ -342,33 +342,6 @@ export class ChatService {
       callback(messages.reverse());
     });
   }
-
-  // Listen to conversations
-  subscribeToConversations(
-    userId: string,
-    callback: (conversations: IConversation[]) => void
-  ): () => void {
-    const conversationsQuery = query(
-      collection(this.firestore, COLLECTIONS.CONVERSATIONS),
-      where('members', 'array-contains', userId),
-      orderBy('updatedAt', 'desc')
-    );
-
-    return onSnapshot(conversationsQuery, (snapshot) => {
-      const conversations: IConversation[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        conversations.push({
-          id: doc.id,
-          ...data,
-          createdAt: new Date(data.createdAt).valueOf() || Date.now(),
-          updatedAt: new Date(data.updatedAt).valueOf() || Date.now(),
-          latestMessageTime: new Date(data.latestMessageTime).valueOf() || null
-        } as IConversation);
-      });
-      callback(conversations);
-    });
-  }
 }
 
 export default new ChatService();
@@ -413,15 +386,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
   // Subscribe to conversations
   useEffect(() => {
     if (!user?.id) return;
-
     setLoading(true);
-    unsubscribeConversationsRef.current = ChatService.subscribeToConversations(
-      userId: user?.id,
-      (newConversations) => {
-        setConversations(newConversations);
-        setLoading(false);
-      }
-    );
 
     return () => {
       if (unsubscribeConversationsRef.current) {
