@@ -1,129 +1,190 @@
-import React, { useState, useCallback } from 'react';
-import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
-import { TypingIndicator } from './TypingIndicator';
-import { ConnectionStatus } from './ConnectionStatus';
-import { useChatContext } from '../context/ChatProvider';
-import { FileUploader } from '../addons/fileUpload/FileUploader';
-import { GalleryView } from '../addons/gallery/GalleryView';
-import { useChat } from '../hooks/useChat';
-import { Message, IUser } from '../types';
-import './ChatScreen.css';
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { MessageList } from "./MessageList";
+import { MessageInput } from "./MessageInput";
+import { TypingIndicator } from "./TypingIndicator";
+import { useChatContext } from "../context/ChatProvider";
+import { FileUploader } from "../addons/fileUpload/FileUploader";
+import { useChat } from "../hooks/useChat";
+import { Message, IUser, ConversationProps } from "../types";
+import { ChatService } from "../services/chat";
+import { ButtonMaterialIcon } from "./ButtonMaterialIcon";
+import "./ChatScreen.css";
+import { ChatHeader } from "./ChatHeader";
+import { generateConversationId } from "../utils/conversation";
+import ChatList, { ChatListProps } from "./ChatList";
+import { ChatNewModal, ChatNewModalRef } from "./ChatNewModal";
 
 export interface ChatScreenProps {
-  conversationId: string;
-  partners: Array<{
-    id: string;
-    name: string;
-    avatar?: string;
-  }>;
-  memberIds: string[];
+  conversationId?: string;
+  partners?: Array<IUser>;
   style?: React.CSSProperties;
   className?: string;
   onSend?: (messages: Message[]) => void;
-  showCamera?: boolean;
   showFileUpload?: boolean;
-  showGallery?: boolean;
   isGroup?: boolean;
+  renderHeader?: () => React.ReactNode;
+  renderChatList?: (props: ChatListProps) => React.ReactNode;
+  renderChatNewModal?: (props: {
+    onUserSelect: (user: { id: string; name: string; avatar?: string }) => void;
+  }) => React.ReactNode;
 }
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({
   conversationId,
-  partners,
-  memberIds,
+  partners = [],
   style,
-  className = '',
+  className = "",
   onSend,
-  showCamera = true,
   showFileUpload = true,
-  showGallery = true,
   isGroup = false,
+  renderHeader,
+  renderChatList,
+  renderChatNewModal,
 }) => {
-  const { currentUser, isInitialized } = useChatContext();
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const { currentUser } = useChatContext();
   const [showUploader, setShowUploader] = useState(false);
-  const [galleryFiles, setGalleryFiles] = useState([]);
 
-  const convertedUser: IUser = currentUser ? {
-    id: currentUser.id.toString(),
-    name: currentUser.name || 'Unknown User',
-    avatar: currentUser.avatar,
-  } : {
-    id: '',
-    name: 'Unknown User',
-    avatar: undefined,
-  };
+  const chatNewModalRef = useRef<ChatNewModalRef>(null);
 
-  const {
-    messages,
-    loading,
-    error,
-    sendMessage,
-    markAsRead,
-  } = useChat({
+  // Conversations list from users/{userId}/conversations
+  const [conversations, setConversations] = useState<Array<ConversationProps>>(
+    []
+  );
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | undefined
+  >(conversationId);
+  const [selectedName, setSelectedName] = useState<string>("");
+
+  // Selected partners in the selected conversation
+  const [selectedPartners, setSelectedPartners] =
+    useState<Array<IUser>>(partners);
+
+  const { messages, loading, error, sendMessage, markAsRead } = useChat({
     user: currentUser,
-    conversationId,
-    memberIds: [...new Set([`${currentUser.id}`, ...partners.map(partner => partner.id)])],
-    name: isGroup ? `group_${currentUser.id},${partners.map(partner => partner.name).join(',')}` : partners.find(partner => partner.id !== currentUser.id)?.name,
+    conversationId: selectedConversationId || conversationId,
+    memberIds: [
+      ...new Set([
+        `${currentUser.id}`,
+        ...selectedPartners.map((partner) => partner.id),
+      ]),
+    ],
+    name: isGroup
+      ? `group_${currentUser.id},${selectedPartners
+          .map((partner) => partner.name)
+          .join(",")}`
+      : selectedPartners.find((partner) => partner.id !== currentUser.id)
+          ?.name || selectedName,
   });
 
-  const handleSendMessage = useCallback(async (text: string) => {
-    try {
-      await sendMessage(text);
-    } catch (error) {
-      console.error('Failed to send message:', error);
+  const convertedUser: IUser = currentUser
+    ? {
+        id: currentUser.id.toString(),
+        name: currentUser.name || "Unknown User",
+        avatar: currentUser.avatar,
+      }
+    : {
+        id: "",
+        name: "Unknown User",
+        avatar: undefined,
+      };
+
+  // Subscribe to user conversations for sidebar
+  useEffect(() => {
+    const chatService = ChatService.getInstance();
+    if (!currentUser?.id) return;
+    const unsubscribe = chatService.subscribeToUserConversations(
+      `${currentUser.id}`,
+      (items) => {
+        setConversations(items);
+        // If nothing selected, pick first
+        if (!selectedConversationId && items.length > 0) {
+          setSelectedConversationId(items[0].id);
+          setSelectedName(items[0].name || "");
+        }
+      }
+    );
+    return () => unsubscribe?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (selectedConversationId) {
+      markAsRead();
     }
-  }, [sendMessage]);
+  }, [selectedConversationId, markAsRead]);
 
-  const handleSendTextMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return;
-    await handleSendMessage(text);
-  }, [handleSendMessage]);
+  const handleSendMessage = useCallback(
+    async (text: string) => {
+      try {
+        await sendMessage(text);
+      } catch (error) {
+        console.error("Failed to send message:", error);
+      }
+    },
+    [sendMessage]
+  );
 
-  const handleCameraCapture = useCallback(async (blob: Blob, type: 'photo' | 'video') => {
-    // Upload the captured media and send as message
-    // This would typically involve uploading to Firebase Storage
-    console.log('Camera captured:', type, blob);
-    setIsCameraOpen(false);
-
-    // For now, we'll send a text message indicating media was captured
-    const text = `${type === 'photo' ? 'Photo' : 'Video'} captured`;
-    await handleSendMessage(text);
-  }, [handleSendMessage]);
-
-  const handleFileUpload = useCallback(async (files: File[]) => {
-    // Handle file uploads
-    console.log('Files uploaded:', files);
-    setShowUploader(false);
-
-    // For each file, send a text message indicating file was uploaded
-    for (const file of files) {
-      const text = `File uploaded: ${file.name}`;
+  const handleSendTextMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
       await handleSendMessage(text);
-    }
-  }, [handleSendMessage]);
+      markAsRead();
+    },
+    [handleSendMessage, markAsRead]
+  );
 
-  if (!isInitialized) {
-    return (
-      <div className={`chat-screen loading ${className}`} style={style}>
-        <div className="loading-indicator">
-          <div className="spinner" />
-          <p>Initializing chat...</p>
-        </div>
-      </div>
-    );
-  }
+  const startChatWithUser = useCallback(
+    async (targetUser: IUser) => {
+      try {
+        const chatService = ChatService.getInstance();
+        const newId = await chatService.createConversation(
+          [`${currentUser.id}`, targetUser.id],
+          `${currentUser.id}`,
+          "private",
+          currentUser.name,
+          targetUser.name,
+          generateConversationId([`${currentUser.id}`, targetUser.id])
+        );
+        chatNewModalRef.current?.hide();
+        setSelectedConversationId(newId);
+        setSelectedName(targetUser.name || "");
+        setSelectedPartners([targetUser]);
+      } catch (e) {
+        console.error("Failed to start chat", e);
+      }
+    },
+    [currentUser?.id]
+  );
 
-  if (loading) {
-    return (
-      <div className={`chat-screen loading ${className}`} style={style}>
-        <div className="loading-indicator">
-          <div className="spinner" />
-          <p>Loading messages...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleFileUpload = useCallback(
+    async (files: File[]) => {
+      // Handle file uploads
+      console.log("Files uploaded:", files);
+      setShowUploader(false);
+
+      // For each file, send a text message indicating file was uploaded
+      for (const file of files) {
+        const text = `File uploaded: ${file.name}`;
+        await handleSendMessage(text);
+      }
+    },
+    [handleSendMessage]
+  );
+
+  const handleSelectConversation = useCallback(
+    (conversation: ConversationProps) => {
+      setSelectedConversationId(conversation.id);
+      setSelectedName(conversation.name || "");
+      setSelectedPartners(
+        conversation.members
+          .filter((m: string) => m !== currentUser?.id)
+          .map((m: string) => ({ id: m }))
+      );
+    },
+    []
+  );
+
+  // Do not block the whole screen while loading a conversation
 
   if (error) {
     return (
@@ -138,73 +199,94 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   return (
     <div className={`chat-screen ${className}`} style={style}>
-      {/* Chat Header */}
-      <div className="chat-header">
-        <div className="partner-info">
-          {partners.map((partner, index) => (
-            <div key={partner.id} className="partner">
-              {partner.avatar && (
-                <img
-                  src={partner.avatar}
-                  alt={partner.name}
-                  className="partner-avatar"
-                />
-              )}
-              <span className="partner-name">
-                {partner.name}
-                {index < partners.length - 1 && ', '}
+      {/* App Header */}
+      {renderHeader ? renderHeader() : <ChatHeader currentUser={currentUser} />}
+
+      {/* Main Content */}
+      <div className="main-content">
+        {/* Sidebar - Conversations */}
+        {renderChatList ? (
+          renderChatList({
+            openNewChatFunc: () => chatNewModalRef.current?.show(),
+            conversations,
+            selectedConversationId: selectedConversationId || "",
+            handleSelectConversation,
+          })
+        ) : (
+          <ChatList
+            openNewChatFunc={() => chatNewModalRef.current?.show()}
+            conversations={conversations}
+            selectedConversationId={selectedConversationId || ""}
+            handleSelectConversation={handleSelectConversation}
+          />
+        )}
+
+        {/* Chat Panel */}
+        <section className="chat-panel">
+          <div className="chat-panel-header">
+            <div className="chat-target">
+              <span className="target-name">
+                {selectedName || selectedPartners[0]?.name || "..."}
               </span>
             </div>
-          ))}
-        </div>
-        <ConnectionStatus status="connected" />
+            <div className="chat-actions">
+              <ButtonMaterialIcon
+                className="icon-btn"
+                title="Voice call"
+                icon="call"
+              />
+              <ButtonMaterialIcon
+                className="icon-btn"
+                title="Video call"
+                icon="videocam"
+              />
+            </div>
+          </div>
+
+          <div className="messages-container">
+            {loading ? (
+              <div className="panel-loading">
+                <div className="spinner" />
+              </div>
+            ) : (
+              <>
+                <MessageList
+                  messages={messages}
+                  currentUser={convertedUser}
+                  onMessageUpdate={(message) =>
+                    console.log("Message updated:", message)
+                  }
+                  onMessageDelete={(messageId) =>
+                    console.log("Delete message:", messageId)
+                  }
+                />
+                <TypingIndicator typingUsers={[]} />
+              </>
+            )}
+          </div>
+
+          <div className="panel-input">
+            <div className="input-box">
+              {showFileUpload && (
+                <ButtonMaterialIcon
+                  className="attach-btn"
+                  title="Attach file"
+                  icon="attach_file"
+                  onClick={() => setShowUploader(true)}
+                />
+              )}
+              <div className="input-flex">
+                <MessageInput
+                  onSendMessage={handleSendTextMessage}
+                  onTyping={(isTyping) => console.log("Typing:", isTyping)}
+                  placeholder="Type your message..."
+                  className="message-input-reset"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-
-      {/* Messages Area */}
-      <div className="messages-container">
-        <MessageList
-          messages={messages}
-          currentUser={convertedUser}
-          onMessageUpdate={(message) => console.log('Message updated:', message)}
-          onMessageDelete={(messageId) => console.log('Delete message:', messageId)}
-        />
-        <TypingIndicator typingUsers={[]} />
-      </div>
-
-      {/* Input Area */}
-      <div className="input-container">
-        <MessageInput
-          onSendMessage={handleSendTextMessage}
-          onTyping={(isTyping) => console.log('Typing:', isTyping)}
-          placeholder="Type a message..."
-        />
-
-        {/* Action Buttons */}
-        <div className="action-buttons">
-          {showFileUpload && (
-            <button
-              className="action-button upload-button"
-              onClick={() => setShowUploader(true)}
-              title="Upload File"
-            >
-              📎
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Gallery View */}
-      {showGallery && galleryFiles.length > 0 && (
-        <div className="gallery-container">
-          <GalleryView
-            files={galleryFiles}
-            onFileSelect={(file) => console.log('File selected:', file)}
-            onFileDelete={(fileId) => {
-              setGalleryFiles(prev => prev.filter((f: any) => f.id !== fileId));
-            }}
-          />
-        </div>
-      )}
 
       {/* File Uploader Modal */}
       {showUploader && (
@@ -212,20 +294,29 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           <div className="uploader-content">
             <FileUploader
               onFileSelect={handleFileUpload}
-              onUploadComplete={(urls) => console.log('Upload complete:', urls)}
-              onError={(error) => console.error('Upload error:', error)}
+              onUploadComplete={(urls) => console.log("Upload complete:", urls)}
+              onError={(error) => console.error("Upload error:", error)}
               accept="image/*,video/*,.pdf,.doc,.docx,.txt"
               multiple
               maxFiles={5}
             />
-            <button
+            <ButtonMaterialIcon
               className="close-uploader"
+              title="Close uploader"
+              icon="close"
               onClick={() => setShowUploader(false)}
-            >
-              ✕
-            </button>
+            />
           </div>
         </div>
+      )}
+
+      {/* New Chat Modal */}
+      {renderChatNewModal ? (
+        renderChatNewModal({
+          onUserSelect: startChatWithUser,
+        })
+      ) : (
+        <ChatNewModal ref={chatNewModalRef} onUserSelect={startChatWithUser} />
       )}
     </div>
   );

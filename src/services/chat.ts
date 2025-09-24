@@ -10,7 +10,6 @@ import {
   limit,
   startAfter,
   onSnapshot,
-  where,
   getDocs,
   getDoc,
   DocumentSnapshot,
@@ -21,11 +20,8 @@ import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {getFirebaseFirestore, getFirebaseStorage} from './firebase';
 import {UserService} from './user';
 import {
-  MessageProps,
   FireStoreCollection,
-  EncryptionFunctions,
   IMessage,
-  IConversation,
   MediaType,
 } from '../types';
 import {convertToLatestMessage} from '../utils/formatters';
@@ -45,13 +41,11 @@ export class ChatService {
   static instance: ChatService;
   private db;
   private storage;
-  private encryptionFunctions?: EncryptionFunctions;
   private userService: UserService;
 
-  constructor(encryptionFunctions?: EncryptionFunctions) {
+  constructor() {
     this.db = getFirebaseFirestore();
     this.storage = getFirebaseStorage();
-    this.encryptionFunctions = encryptionFunctions;
     this.userService = UserService.getInstance();
   }
 
@@ -68,8 +62,8 @@ export class ChatService {
     initiatorId: string,
     type: 'private' | 'group' = 'private',
     name?: string,
-    conversationId?: string,
     otherName?: string,
+    conversationId?: string,
   ): Promise<string> {
     try {
       const conversationData = {
@@ -111,8 +105,9 @@ export class ChatService {
       const promises = memberIds.map(async (memberId) => {
         // Ensure user document exists
         await this.userService.createUserIfNotExists(memberId);
-        const otherMember = memberIds.filter(id => id !== memberId);
 
+        // Get the chat name based on the memberId and initiatorId
+        const chatName = memberId === initiatorId ? otherName : name;
         // Add conversation reference to user's conversations subcollection
         await setDoc(
           doc(this.db, COLLECTIONS.USERS, memberId, COLLECTIONS.CONVERSATIONS, docRefId),
@@ -121,7 +116,7 @@ export class ChatService {
             unRead: 0,
             updatedAt: Date.now(),
             members: memberIds,
-            name: name || '',
+            name: chatName || '',
           }
         );
       });
@@ -149,31 +144,6 @@ export class ChatService {
       console.error('Error checking conversation existence:', error);
       return false;
     }
-  }
-
-  /**
-   * Get an existing conversation or create a new one if it doesn't exist
-   * @param conversationId - The ID of the conversation
-   * @param memberIds - Array of member user IDs
-   * @param initiatorId - The ID of the user creating the conversation
-   * @param type - Type of conversation ('private' or 'group')
-   * @param name - Optional name for the conversation
-   * @returns Promise<string> - The conversation ID
-   */
-  async getOrCreateConversation(
-    conversationId: string,
-    memberIds: string[],
-    initiatorId: string,
-    type: 'private' | 'group' = 'private',
-    name?: string
-  ): Promise<string> {
-    const exists = await this.conversationExists(conversationId);
-
-    if (!exists) {
-      return await this.createConversation(memberIds, initiatorId, type, name);
-    }
-
-    return conversationId;
   }
 
   /**
@@ -209,8 +179,8 @@ export class ChatService {
           initiatorId,
           type,
           conversationOptions?.name,
-          conversationId,
           conversationOptions?.otherName,
+          conversationId,
         );
       }
 
@@ -241,19 +211,13 @@ export class ChatService {
       );
 
       if (conversationDoc.exists()) {
-        const otherMembers = memberIds.filter(
-          (memberId: string) => memberId !== message.senderId
-        );
-
-        const updatePromises = otherMembers.map(async (memberId: string) => {
-          // Ensure user document exists
-          await this.userService.createUserIfNotExists(memberId);
-
+        const updatePromises = memberIds.map(async (memberId: string) => {
+          const isSender = memberId === message.senderId;
           // Update unread count in user's conversations subcollection
           await setDoc(
             doc(this.db, COLLECTIONS.USERS, memberId, COLLECTIONS.CONVERSATIONS, conversationId),
             {
-              unRead: increment(1),
+              unRead: increment(isSender ? 0 : 1),
               updatedAt: Date.now(),
               latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', message.text || ''),
             },
@@ -303,40 +267,6 @@ export class ChatService {
       // Get the last document for pagination
       const lastDoc = snapshot.docs[snapshot.docs.length - 1];
       callback(messages.reverse(), lastDoc);
-    });
-  }
-
-  // Listen to conversations - as per documentation
-  subscribeToConversations(
-    userId: string,
-    callback: (conversations: IConversation[]) => void
-  ): () => void {
-    // First ensure user document exists
-    this.userService.createUserIfNotExists(userId).catch(console.error);
-
-    const conversationsQuery = query(
-      collection(this.db, COLLECTIONS.CONVERSATIONS),
-      where('members', 'array-contains', userId),
-      orderBy('updatedAt', 'desc')
-    );
-
-    return onSnapshot(conversationsQuery, (snapshot) => {
-      const conversations: IConversation[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        conversations.push({
-          id: doc.id,
-          members: data.members,
-          latestMessage: data.latestMessage,
-          latestMessageTime: data.latestMessageTime ? new Date(data.latestMessageTime).valueOf() : Date.now(),
-          unRead: data.unRead,
-          name: data.name,
-          type: data.type,
-          createdAt: data.createdAt ? new Date(data.createdAt).valueOf() : Date.now(),
-          updatedAt: data.updatedAt ? new Date(data.updatedAt).valueOf() : Date.now(),
-        } as IConversation);
-      });
-      callback(conversations);
     });
   }
 
@@ -422,12 +352,11 @@ export class ChatService {
   }
 
   // Update unread count
-  async updateunRead(conversationId: string, userId: string, count: number): Promise<void> {
+  async updateUnread(conversationId: string, userId: string): Promise<void> {
     try {
-      const conversationRef = doc(this.db, FireStoreCollection.conversations, conversationId);
+      const conversationRef = doc(this.db, FireStoreCollection.users, userId, FireStoreCollection.conversations, conversationId);
       await updateDoc(conversationRef, {
-        [`unRead.${userId}`]: count,
-        updatedAt: Date.now(),
+        unRead: 0,
       });
     } catch (error) {
       console.error('Error updating unread count:', error);
@@ -463,33 +392,6 @@ export class ChatService {
     } catch (error) {
       console.error('Error deleting message:', error);
       throw new Error('Failed to delete message');
-    }
-  }
-
-  // Update message
-  async updateMessage(conversationId: string, messageId: string, updates: Partial<MessageProps>): Promise<void> {
-    try {
-      const messageRef = doc(this.db, FireStoreCollection.conversations, conversationId, FireStoreCollection.messages, messageId);
-
-      let processedUpdates = {...updates};
-
-      // Encrypt text if encryption is enabled
-      if (this.encryptionFunctions?.encryptFunctionProp && updates.text) {
-        try {
-          processedUpdates.text = await this.encryptionFunctions.encryptFunctionProp(updates.text);
-        } catch (error) {
-          console.error('Encryption failed:', error);
-          // Continue without encryption if it fails
-        }
-      }
-
-      await updateDoc(messageRef, {
-        ...processedUpdates,
-        updatedAt: Date.now(),
-      });
-    } catch (error) {
-      console.error('Error updating message:', error);
-      throw new Error('Failed to update message');
     }
   }
 

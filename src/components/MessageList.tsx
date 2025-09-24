@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatDistanceToNow, format } from "date-fns";
-import { UserAvatar } from "./UserAvatar";
+import { format } from "date-fns";
 import { Message, MessageListProps } from "../types";
 
 interface MessageItemProps {
@@ -74,7 +73,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
               isOwn ? "text-right" : ""
             }`}
           >
-            <span className="font-medium">{message.userId}</span>
+            {/* <span className="font-medium">{message.userId}</span> */}
             <span className="ml-2">{formatTime(message.createdAt)}</span>
           </div>
         )}

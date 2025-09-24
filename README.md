@@ -22,282 +22,128 @@ The `react-firebase-chat` library is designed to:
 
 This web library uses client-side timestamps (`Date.now()`) when writing to Firestore for fields like `createdAt`, `updatedAt`, `latestMessageTime`, and `joinedAt`. If you require server-side timestamps for stronger ordering guarantees across clients, you may change these to Firestore `serverTimestamp()` in your app.
 
-## ✅ Implementation Status
-
-Based on the [Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md), here's the current completion status:
-
-### ✅ Phase 1: Project Setup & Foundation (COMPLETED)
-- [x] Project structure created with TypeScript
-- [x] Dependencies installed and configured  
-- [x] Build system setup with PostCSS and Tailwind
-- [x] Testing framework configured with Jest
-
-### ✅ Phase 2: Firebase Web SDK Integration (COMPLETED)  
-- [x] Firebase Web SDK configured and initialized
-- [x] Services match React Native app API exactly
-- [x] Database schema compatible with RN implementation
-- [x] Real-time message synchronization working
-
-### ✅ Phase 3: Core Components Development (COMPLETED)
-- [x] **ChatProvider** - Foundation component with context
-- [x] **ChatScreen** - Main chat interface component  
-- [x] **MessageList** - Real-time message display
-- [x] **MessageInput** - Message composition with media support
-- [x] **ConnectionStatus** - Network status indicator
-- [x] **TypingIndicator** - Real-time typing status
-- [x] **UserAvatar** - User profile display component
-
-### ✅ Phase 4: Advanced Features (COMPLETED)
-- [x] **Camera Integration** - Web Camera API with photo/video capture
-- [x] **File Upload** - Drag & drop file uploading with progress
-- [x] **Gallery View** - Media file gallery and viewer
-- [x] **Audio Support** - Web audio recording capabilities
-- [x] **Cross-platform Sync** - Messages sync between web and mobile
-- [x] **Message Pagination** - Load more messages efficiently
-
-### ✅ Phase 5: Real-time Communication Testing (COMPLETED)
-- [x] Cross-platform test scenarios implemented
-- [x] Performance testing for 1000+ messages
-- [x] Real-time updates optimization
-- [x] Message delivery time monitoring
-- [x] Integration tests for RN ↔ Web communication
-
-### ✅ Phase 6: Package & Distribution (COMPLETED)
-- [x] TypeScript build configuration
-- [x] Example applications created (basic + advanced)
-- [x] Comprehensive documentation
-- [x] API compatibility with RN app maintained
-
-### ✅ Phase 7: Production Features (COMPLETED)
-- [x] Error handling and validation
-- [x] Performance optimization
-- [x] Security audit integration
-- [x] Cross-browser compatibility testing
-- [x] Bundle size optimization (< 50KB gzipped)
-
-### ✅ Phase 8: Deployment Ready (COMPLETED)
-- [x] Automated deployment script
-- [x] NPM package configuration
-- [x] CDN distribution support
-- [x] Monitoring and analytics setup
-- [x] Production build optimization
-
-## 📊 Success Metrics Achieved
-
-As per the Implementation Roadmap, we've achieved all target metrics:
-
-### ✅ Technical Metrics  
-- **Message delivery time**: < 100ms (Target: < 100ms)
-- **Component bundle size**: ~45KB gzipped (Target: < 50KB)
-- **Memory usage**: < 8MB for 1000 messages (Target: < 10MB)  
-- **API compatibility**: 100% with React Native app (Target: 100%)
-
-### ✅ User Experience Metrics
-- **Seamless cross-platform transition**: ✅ Achieved
-- **Zero message loss during sync**: ✅ Verified
-- **Consistent UI/UX patterns**: ✅ Implemented
-- **Real-time features reliability**: ✅ Tested
-
-### ✅ Development Metrics
-- **Easy installation**: < 2 minutes setup (Target: < 5 minutes)
-- **Clear documentation**: ✅ Comprehensive guides provided
-- **Example applications**: ✅ Basic, Advanced, and Testing examples
-- **TypeScript support**: ✅ Full type safety
-
-## 🔄 Cross-Platform Communication Verified
-
-The library has been tested and verified for seamless communication with React Native Firebase chat applications:
-
-- ✅ **Messages sync instantly** between web and mobile platforms
-- ✅ **Media files** (images, videos, audio) are fully compatible
-- ✅ **User presence** and typing indicators work across platforms  
-- ✅ **Conversation state** synchronizes in real-time
-- ✅ **File uploads** from web appear correctly on mobile
-- ✅ **Message encryption** (when enabled) works cross-platform
-
-## 🚀 Quick Start
-
-### Core Features
-- 🔥 **Firebase Web SDK Integration** - Compatible with React Native Firebase
-- 💬 **Real-time Messaging** - Instant cross-platform message delivery
-- 📱 **Cross-Platform Sync** - Messages sync between web and mobile instantly
-- 🔐 **Data Compatibility** - Identical data structures as React Native app
-- ⌨️ **Typing Indicators** - Real-time typing status across platforms
-- � **Media Sharing** - Images, videos, and file uploads
-- 🎨 **Customizable UI** - Modern, responsive design
-- � **Encryption Support** - Optional message encryption
-- 📊 **Message Status** - Delivery and read receipts
-- 🌙 **Theme Support** - Light, dark, and auto themes
-- 🔍 **TypeScript** - Full type safety with RN compatibility
-
-### Web-Specific Addons
-- 📷 **Camera Integration** - Web Camera API for photo/video capture
-- 📁 **File Upload** - Drag & drop file uploading
-- �️ **Gallery View** - Media file gallery and viewer
-- 🎵 **Audio Recording** - Web audio recording capabilities
-
 ## Installation
 
 ### From NPM (Recommended)
 ```bash
-npm install react-firebase-chat firebase
+npm install react-firebase-chat firebase tailwindcss framer-motion
 # or
-yarn add react-firebase-chat firebase
+yarn add react-firebase-chat firebase tailwindcss framer-motion
 ```
 
 ### From GitHub
 ```bash
-npm install git+https://github.com/your-username/react-firebase-chat.git firebase
+npm install git+https://github.com/your-username/react-firebase-chat.git firebase tailwindcss framer-motion
 # or
-yarn add git+https://github.com/your-username/react-firebase-chat.git firebase
+yarn add git+https://github.com/your-username/react-firebase-chat.git firebase tailwindcss framer-motion
 ```
 
 > **Note**: When installing from GitHub, the package will automatically build the `dist` folder during installation thanks to the `postinstall` script.
 
-### Importing Styles
-
-The library includes CSS styles that need to be imported for proper styling. You have several options:
-
-#### Option 1: Import All Styles (Recommended)
-```tsx
-import 'react-firebase-chat/styles';
+### Installing Dev Dependencies
+```bash
+npm install --save-dev autoprefixer postcss postcss-cli
+# or
+yarn add autoprefixer postcss postcss-cli --dev
 ```
 
-#### Option 2: Import Individual Component Styles
-```tsx
-// Import specific component styles
-import 'react-firebase-chat/dist/components/ChatScreen.css';
-import 'react-firebase-chat/dist/addons/camera/CameraView.css';
-import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
-import 'react-firebase-chat/dist/addons/gallery/GalleryView.css';
-import 'react-firebase-chat/dist/addons/gallery/MediaViewer.css';
-```
-
-#### Option 3: Import in Your CSS File
-```css
-@import 'react-firebase-chat/styles';
-```
-
-### Troubleshooting CSS Issues
-
-If you're experiencing missing styles or CSS not loading:
-
-1. **Make sure you've imported the styles**:
-   ```tsx
-   import 'react-firebase-chat/styles';
-   ```
-
-2. **Check if the dist folder exists** after installation:
-   ```bash
-   ls node_modules/react-firebase-chat/dist/
-   ```
-
-3. **If installing from GitHub and dist folder is missing**, run:
-   ```bash
-   cd node_modules/react-firebase-chat
-   npm run build
-   ```
-
-4. **For individual component styles**, import them directly:
-   ```tsx
-   import 'react-firebase-chat/dist/addons/camera/CameraView.css';
-   import 'react-firebase-chat/dist/addons/fileUpload/FileUploader.css';
-   ```
+> **Note**: Our package is built with tailwindcss so if you did not init the project with it, you will have to configure for it before using this package.
 
 ## 🚀 Quick Start
+
+### Theme Notice
+Add Material Icons on root head tag
+```html
+  <html lang="en">
+    <head>
+      {/* Add Material Icons */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossOrigin="anonymous"
+      />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+        rel="stylesheet"
+      />
+      {/* Add Material Icons */}
+    </head>
+    <body>
+      {children}
+    </body>
+  </html>
+```
 
 ### 1. Initialize with ChatProvider
 
 ```tsx
-import React from 'react';
-import { ChatProvider, ChatScreen } from 'react-firebase-chat';
-import 'react-firebase-chat/styles'; // Import styles
+"use client";
+
+import React from "react";
+import {
+  ChatScreen as BasicChatScreen,
+  ChatProvider,
+  IUser,
+  initializeFirebase,
+} from "react-firebase-chat";
 
 const firebaseConfig = {
   apiKey: "your-web-api-key",
-  authDomain: "your-project.firebaseapp.com", 
+  authDomain: "your-project.firebaseapp.com",
   projectId: "your-project-id",
   storageBucket: "your-project.appspot.com",
   messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  appId: "your-app-id",
+  measurementId: "your-measurement-id",
 };
 
-const currentUser = {
-  id: 'web-user-123',
-  name: 'John Doe',
-  avatar: 'https://example.com/avatar.jpg'
-};
+initializeFirebase(firebaseConfig);
 
-function App() {
+export default function ChatRoutePage() {
+  // Replace with your user information from your auth system
+  const currentUser: IUser = {
+    id: "your-user-id",
+    name: "your-user-name",
+    avatar: "your-user-avatar",
+  };
+
+  if (!currentUser) {
+    return (
+      <div style={{ padding: 24 }}>
+        <p>Missing user information. Please go back to the login page.</p>
+      </div>
+    );
+  }
+
   return (
-    <ChatProvider 
-      currentUser={currentUser} 
-      firebaseConfig={firebaseConfig}
+    <div
+      style={{
+        height: "100vh",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
-      <ChatApp />
-    </ChatProvider>
-  );
-}
-
-function ChatApp() {
-  const partnerInfo = {
-    id: 'partner-123',
-    name: 'Jane Smith',
-    avatar: 'https://example.com/jane.jpg',
-  };
-
-  return (
-    <ChatScreen 
-      conversationId="conversation-123"
-      memberIds={[partnerInfo.id]} 
-      partners={[partnerInfo]}
-      showFileUpload
-      showGallery
-    />
-  );
-}
-
-export default App;
-```
-
-### 2. Advanced Usage with Hooks
-
-```tsx
-import { useChat, useChatContext } from 'react-firebase-chat';
-
-const CustomChatApp: React.FC = () => {
-  const { currentUser } = useChatContext();
-  const { messages, sendMessage, loading } = useChat({
-    user: currentUser,
-    conversationId: 'conversation-123'
-  });
-
-  const handleSendMessage = async (text: string) => {
-    await sendMessage(text);
-  };
-
-  return (
-    <div className="custom-chat">
-      {/* Your custom UI implementation */}
-    </div>
-  );
-};
-```
-
-3. **Compose with individual components:**
-```tsx
-import { MessageList, MessageInput, UserAvatar, TypingIndicator } from 'react-firebase-chat';
-
-function CustomChat() {
-  return (
-    <div className="chat-container">
-      <MessageList messages={messages} currentUser={currentUser} />
-      <TypingIndicator typingUsers={typingUsers} />
-      <MessageInput onSendMessage={handleSend} />
+      <div
+        style={{
+          height: 1000,
+          width: 1000,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <ChatProvider currentUser={currentUser}>
+          <BasicChatScreen partners={[]} showFileUpload={true} />
+        </ChatProvider>
+      </div>
     </div>
   );
 }
 ```
+
+> **Note**: You can check our Auth example for a basic UserService usage on [Auth Example](./examples/auth-example.tsx).
 
 ## Authentication
 This library does not include auth utilities. Provide your own auth and pass `currentUser` to `ChatProvider`.
@@ -381,63 +227,6 @@ const unsubscribe = chatService.subscribeToMessages(
 );
 ```
 
-### Addon Components
-
-The library includes powerful addon components for enhanced functionality:
-
-```tsx
-import { 
-  FileUploader, 
-  CameraView, 
-  GalleryView,
-  useFileUpload,
-  useCamera 
-} from 'react-firebase-chat';
-
-// File Upload
-function FileUploadExample() {
-  const { uploadFile, uploading, progress } = useFileUpload();
-  
-  return (
-    <FileUploader
-      onFileSelect={(files) => console.log('Files selected:', files)}
-      accept="image/*,video/*"
-      multiple
-      maxFiles={5}
-    >
-      <div>Drop files here or click to upload</div>
-    </FileUploader>
-  );
-}
-
-// Camera Integration
-function CameraExample() {
-  const { 
-    isOpen, 
-    openCamera, 
-    closeCamera, 
-    capturePhoto 
-  } = useCamera();
-  
-  return (
-    <div>
-      <button onClick={openCamera}>Open Camera</button>
-      {isOpen && (
-        <CameraView
-          isOpen={isOpen}
-          onClose={closeCamera}
-          onCapture={(blob, type) => {
-            console.log(`${type} captured:`, blob);
-            closeCamera();
-          }}
-          mode="photo"
-        />
-      )}
-    </div>
-  );
-}
-```
-
 ## Services
 
 The library provides three main services for advanced functionality:
@@ -500,72 +289,25 @@ const db = getFirebaseFirestore();
 
 > 📖 **For detailed service documentation, see [SERVICES.md](./SERVICES.md)**
 
-## Advanced Usage
-
-### Custom Message Handling
-
-```tsx
-import { useChat } from 'react-firebase-chat';
-
-function CustomChatRoom() {
-  const { messages, sendMessage, loading } = useChat({
-    user: currentUser,
-    conversationId: 'conversation-123'
-  });
-
-  const handleSendMessage = async (text: string) => {
-    await sendMessage(text);
-    // Custom logic after sending
-  };
-
-  return (
-    <div>
-      {messages.map(message => (
-        <div key={message.id}>{message.text}</div>
-      ))}
-    </div>
-  );
-}
-```
-
-### Typing Indicators
-
-```tsx
-import { useTyping } from 'react-firebase-chat';
-
-function TypingExample() {
-  const { typingUsers, setTyping } = useTyping('room-id', 'user-id');
-
-  const handleInputChange = (value: string) => {
-    setTyping(value.length > 0);
-  };
-
-  return (
-    <div>
-      {typingUsers.length > 0 && (
-        <div>{typingUsers.map(u => u.displayName).join(', ')} typing...</div>
-      )}
-    </div>
-  );
-}
-```
-
 ## Components
 
 ### ChatScreen
-Main chat interface component.
+Main chat interface component with three sections: app header, conversation sidebar, and chat panel. Selecting a conversation shows a loader only in the chat panel, not the whole screen.
 
 **Props:**
-- `conversationId: string` - Unique identifier for the conversation
-- `partners: Array<{id: string, name: string, avatar?: string}>` - Array of chat partners
-- `memberIds: string[]` - Array of member user IDs
+- `conversationId?: string` - Optional preselected conversation id
+- `partners?: Array<{id: string, name: string, avatar?: string}>` - Optional partners (for direct usage without sidebar)
+- `memberIds: string[]` - Member user IDs (optional when using sidebar-driven conversations)
 - `style?: React.CSSProperties` - Inline styles
 - `className?: string` - Additional CSS classes
 - `onSend?: (messages: Message[]) => void` - Optional callback when messages are sent
 - `showCamera?: boolean` - Enable camera functionality (default: true)
 - `showFileUpload?: boolean` - Enable file upload (default: true)
-- `showGallery?: boolean` - Enable gallery view (default: true)
 - `isGroup?: boolean` - Whether this is a group chat (default: false)
+
+Sidebar behavior:
+- Lists conversations from `users/{userId}/conversations` with name, latest message, unread badge and online dot placeholder
+- “New” button opens a modal with incremental search (top 3 matches from `UserService` after typing). Selecting a user creates a new conversation and opens it.
 
 ### MessageList
 Display list of messages.
@@ -580,12 +322,13 @@ Display list of messages.
 ### MessageInput
 Text input for composing messages.
 
+The input now relies on its container for styling and no longer enforces `maxLength` internally.
+
 **Props:**
 - `onSendMessage: (text: string) => void` - Send message handler
 - `onTyping?: (isTyping: boolean) => void` - Typing indicator handler
 - `disabled?: boolean` - Disable input
 - `placeholder?: string` - Input placeholder text
-- `maxLength?: number` - Maximum message length
 - `className?: string` - Additional CSS classes
 
 ### UserAvatar
@@ -691,7 +434,5 @@ MIT © [Your Name]
 
 ## 📚 Documentation
 
-- **[Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md)** - Development timeline
-- **[ReactJS Support](./REACTJS_SUPPORT.md)** - Full ReactJS integration guide
 - **[Services Documentation](./SERVICES.md)** - Detailed service API reference
 - **[Examples](./examples/)** - Live code examples

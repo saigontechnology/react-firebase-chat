@@ -1,13 +1,13 @@
 import React, { useState, useRef, useCallback } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { MessageInputProps } from '../types';
+import { ButtonMaterialIcon } from './ButtonMaterialIcon';
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   onTyping,
   disabled = false,
   placeholder = 'Type a message...',
-  maxLength = 1000,
   className = '',
 }) => {
   const [message, setMessage] = useState('');
@@ -17,30 +17,27 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
+    setMessage(value);
 
-    if (value.length <= maxLength) {
-      setMessage(value);
-
-      // Handle typing indicator
-      if (onTyping) {
-        if (!isTyping && value.trim()) {
-          setIsTyping(true);
-          onTyping(true);
-        }
-
-        // Clear existing timeout
-        if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current);
-        }
-
-        // Set new timeout to stop typing
-        typingTimeoutRef.current = window.setTimeout(() => {
-          setIsTyping(false);
-          onTyping(false);
-        }, 1000);
+    // Handle typing indicator
+    if (onTyping) {
+      if (!isTyping && value.trim()) {
+        setIsTyping(true);
+        onTyping(true);
       }
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Set new timeout to stop typing
+      typingTimeoutRef.current = window.setTimeout(() => {
+        setIsTyping(false);
+        onTyping(false);
+      }, 1000);
     }
-  }, [maxLength, onTyping, isTyping]);
+  }, [onTyping, isTyping]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -72,18 +69,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [message, disabled, onSendMessage, isTyping, onTyping]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const paste = e.clipboardData.getData('text');
-    if (message.length + paste.length > maxLength) {
-      e.preventDefault();
-      const remaining = maxLength - message.length;
-      setMessage(prev => prev + paste.slice(0, remaining));
-    }
-  }, [message.length, maxLength]);
+  const handlePaste = useCallback((_e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // No max length enforcement
+  }, []);
 
   return (
     <div className={`w-full flex items-stretch space-x-2 bg-white ${className}`}>
-      <div className="flex-1 relative">
+      <div className="flex-1 relative" style={{height: '40px'}}>
         <TextareaAutosize
           ref={textareaRef}
           value={message}
@@ -95,47 +87,29 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           maxRows={5}
           minRows={1}
           className={`
-            w-full px-3 py-2 border border-gray-300 rounded-lg resize-none bg-white text-gray-900 placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-            disabled:bg-gray-100 disabled:cursor-not-allowed
-            ${message.length >= maxLength * 0.9 ? 'border-orange-300' : ''}
-            ${message.length >= maxLength ? 'border-red-300' : ''}
+            w-full px-2 py-2 border-0 rounded-md resize-none bg-transparent text-gray-900 placeholder-gray-400
+            focus:outline-none focus:ring-0 focus:border-transparent
+            disabled:bg-transparent disabled:cursor-not-allowed
           `}
         />
 
-        {maxLength && (
-          <div className="absolute bottom-1 right-2 text-xs text-gray-400">
-            {message.length}/{maxLength}
-          </div>
-        )}
       </div>
 
-      <button
+      <ButtonMaterialIcon
         onClick={handleSend}
         disabled={disabled || !message.trim()}
         className={`
-          self-stretch px-4 rounded-lg font-medium transition-colors flex items-center justify-center
-          ${disabled || !message.trim()
-            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'
-          }
+          self-stretch rounded-lg font-medium transition-colors flex items-center justify-center
+          ${disabled || !message.trim() ? '' : ''}
         `}
+        style={{
+          background: disabled || !message.trim() ? '#e5e7eb' : '#1e88e5',
+          color: disabled || !message.trim() ? '#9ca3af' : '#fff',
+        }}
         title="Send message (Enter)"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-          />
-        </svg>
-      </button>
+        icon="send"
+        size={20}
+      />
     </div>
   );
 };

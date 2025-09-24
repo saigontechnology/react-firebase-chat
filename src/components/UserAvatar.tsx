@@ -16,8 +16,7 @@ const onlineStatusClasses = {
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({
   user,
-  size = 'medium',
-  showOnlineStatus = true,
+  size = 'small',
   className,
 }) => {
   const initials = user.name
@@ -54,17 +53,6 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
           <span>{initials}</span>
         )}
       </div>
-
-      {showOnlineStatus && (
-        <div
-          className={clsx(
-            'absolute rounded-full border-2 border-white',
-            onlineStatusClasses[size],
-            isOnline ? 'bg-green-500' : 'bg-gray-400'
-          )}
-          title={isOnline ? 'Online' : 'Offline'}
-        />
-      )}
     </div>
   );
 };

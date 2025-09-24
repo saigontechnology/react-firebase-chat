@@ -31,7 +31,8 @@
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook",
     "prepare": "npm run build",
-    "postinstall": "npm run build"
+    "postinstall": "npm run build",
+    "release": "npm run build && npm publish --access public"
   },
   "keywords": [
     "react",
@@ -59,6 +60,7 @@
   "devDependencies": {
     "@storybook/addon-essentials": "^7.6.4",
     "@storybook/react": "^7.6.4",
+    "@tailwindcss/postcss": "^4",
     "@testing-library/react": "^14.3.1",
     "@types/jest": "^29.5.8",
     "@types/react": "^18.3.23",
