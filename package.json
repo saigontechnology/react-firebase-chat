@@ -31,7 +31,8 @@
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook",
     "prepare": "npm run build",
-    "postinstall": "npm run build"
+    "postinstall": "npm run build",
+    "release": "npm run build && npm publish --access public"
   },
   "keywords": [
     "react",

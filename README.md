@@ -22,120 +22,6 @@ The `react-firebase-chat` library is designed to:
 
 This web library uses client-side timestamps (`Date.now()`) when writing to Firestore for fields like `createdAt`, `updatedAt`, `latestMessageTime`, and `joinedAt`. If you require server-side timestamps for stronger ordering guarantees across clients, you may change these to Firestore `serverTimestamp()` in your app.
 
-## ✅ Implementation Status
-
-Based on the [Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md), here's the current completion status:
-
-### ✅ Phase 1: Project Setup & Foundation (COMPLETED)
-- [x] Project structure created with TypeScript
-- [x] Dependencies installed and configured  
-- [x] Build system setup with PostCSS and Tailwind
-- [x] Testing framework configured with Jest
-
-### ✅ Phase 2: Firebase Web SDK Integration (COMPLETED)  
-- [x] Firebase Web SDK configured and initialized
-- [x] Services match React Native app API exactly
-- [x] Database schema compatible with RN implementation
-- [x] Real-time message synchronization working
-
-### ✅ Phase 3: Core Components Development (COMPLETED)
-- [x] **ChatProvider** - Foundation component with context
-- [x] **ChatScreen** - Main chat interface component  
-- [x] **MessageList** - Real-time message display
-- [x] **MessageInput** - Message composition with media support
-- [x] **ConnectionStatus** - Network status indicator
-- [x] **TypingIndicator** - Real-time typing status
-- [x] **UserAvatar** - User profile display component
-
-### ✅ Phase 4: Advanced Features (COMPLETED)
-- [x] **Camera Integration** - Web Camera API with photo/video capture
-- [x] **File Upload** - Drag & drop file uploading with progress
-- [x] **Gallery View** - Media file gallery and viewer
-- [x] **Audio Support** - Web audio recording capabilities
-- [x] **Cross-platform Sync** - Messages sync between web and mobile
-- [x] **Message Pagination** - Load more messages efficiently
-
-### ✅ Phase 5: Real-time Communication Testing (COMPLETED)
-- [x] Cross-platform test scenarios implemented
-- [x] Performance testing for 1000+ messages
-- [x] Real-time updates optimization
-- [x] Message delivery time monitoring
-- [x] Integration tests for RN ↔ Web communication
-
-### ✅ Phase 6: Package & Distribution (COMPLETED)
-- [x] TypeScript build configuration
-- [x] Example applications created (basic + advanced)
-- [x] Comprehensive documentation
-- [x] API compatibility with RN app maintained
-
-### ✅ Phase 7: Production Features (COMPLETED)
-- [x] Error handling and validation
-- [x] Performance optimization
-- [x] Security audit integration
-- [x] Cross-browser compatibility testing
-- [x] Bundle size optimization (< 50KB gzipped)
-
-### ✅ Phase 8: Deployment Ready (COMPLETED)
-- [x] Automated deployment script
-- [x] NPM package configuration
-- [x] CDN distribution support
-- [x] Monitoring and analytics setup
-- [x] Production build optimization
-
-## 📊 Success Metrics Achieved
-
-As per the Implementation Roadmap, we've achieved all target metrics:
-
-### ✅ Technical Metrics  
-- **Message delivery time**: < 100ms (Target: < 100ms)
-- **Component bundle size**: ~45KB gzipped (Target: < 50KB)
-- **Memory usage**: < 8MB for 1000 messages (Target: < 10MB)  
-- **API compatibility**: 100% with React Native app (Target: 100%)
-
-### ✅ User Experience Metrics
-- **Seamless cross-platform transition**: ✅ Achieved
-- **Zero message loss during sync**: ✅ Verified
-- **Consistent UI/UX patterns**: ✅ Implemented
-- **Real-time features reliability**: ✅ Tested
-
-### ✅ Development Metrics
-- **Easy installation**: < 2 minutes setup (Target: < 5 minutes)
-- **Clear documentation**: ✅ Comprehensive guides provided
-- **Example applications**: ✅ Basic, Advanced, and Testing examples
-- **TypeScript support**: ✅ Full type safety
-
-## 🔄 Cross-Platform Communication Verified
-
-The library has been tested and verified for seamless communication with React Native Firebase chat applications:
-
-- ✅ **Messages sync instantly** between web and mobile platforms
-- ✅ **Media files** (images, videos, audio) are fully compatible
-- ✅ **User presence** and typing indicators work across platforms  
-- ✅ **Conversation state** synchronizes in real-time
-- ✅ **File uploads** from web appear correctly on mobile
-- ✅ **Message encryption** (when enabled) works cross-platform
-
-## 🚀 Quick Start
-
-### Core Features
-- 🔥 **Firebase Web SDK Integration** - Compatible with React Native Firebase
-- 💬 **Real-time Messaging** - Instant cross-platform message delivery
-- 📱 **Cross-Platform Sync** - Messages sync between web and mobile instantly
-- 🔐 **Data Compatibility** - Identical data structures as React Native app
-- ⌨️ **Typing Indicators** - Real-time typing status across platforms
-- 📎 **Media Sharing** - Images, videos, and file uploads
-- 🎨 **Customizable UI** - Modern, responsive design
-- 🔐 **Encryption Support** - Optional message encryption
-- 📊 **Message Status** - Delivery and read receipts
-- 🌙 **Theme Support** - Light, dark, and auto themes
-- 🔍 **TypeScript** - Full type safety with RN compatibility
-
-### Web-Specific Addons
-- 📷 **Camera Integration** - Web Camera API for photo/video capture
-- 📁 **File Upload** - Drag & drop file uploading
-- 🖼️ **Gallery View** - Media file gallery and viewer
-- 🎵 **Audio Recording** - Web audio recording capabilities
-
 ## Installation
 
 ### From NPM (Recommended)
@@ -192,53 +78,72 @@ Add Material Icons on root head tag
 ### 1. Initialize with ChatProvider
 
 ```tsx
-import React from 'react';
-import { ChatProvider, ChatScreen } from 'react-firebase-chat';
-import 'react-firebase-chat/styles'; // Import styles
+"use client";
+
+import React from "react";
+import {
+  ChatScreen as BasicChatScreen,
+  ChatProvider,
+  IUser,
+  initializeFirebase,
+} from "react-firebase-chat";
 
 const firebaseConfig = {
   apiKey: "your-web-api-key",
-  authDomain: "your-project.firebaseapp.com", 
+  authDomain: "your-project.firebaseapp.com",
   projectId: "your-project-id",
   storageBucket: "your-project.appspot.com",
   messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  appId: "your-app-id",
+  measurementId: "your-measurement-id",
 };
 
-const currentUser = {
-  id: 'web-user-123',
-  name: 'John Doe',
-  avatar: 'https://example.com/avatar.jpg'
-};
+initializeFirebase(firebaseConfig);
 
-function App() {
+export default function ChatRoutePage() {
+  // Replace with your user information from your auth system
+  const currentUser: IUser = {
+    id: "your-user-id",
+    name: "your-user-name",
+    avatar: "your-user-avatar",
+  };
+
+  if (!currentUser) {
+    return (
+      <div style={{ padding: 24 }}>
+        <p>Missing user information. Please go back to the login page.</p>
+      </div>
+    );
+  }
+
   return (
-    <ChatProvider 
-      currentUser={currentUser} 
-      firebaseConfig={firebaseConfig}
+    <div
+      style={{
+        height: "100vh",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
-      <ChatApp />
-    </ChatProvider>
+      <div
+        style={{
+          height: 1000,
+          width: 1000,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <ChatProvider currentUser={currentUser}>
+          <BasicChatScreen partners={[]} showFileUpload={true} />
+        </ChatProvider>
+      </div>
+    </div>
   );
 }
-
-function ChatApp() {
-  // ChatScreen now includes a built-in header (logo, profile, logout)
-  // and a left sidebar listing conversations. Passing conversationId is
-  // optional; when omitted the first conversation is selected.
-  return (
-    <ChatScreen 
-      conversationId="conversation-123" // optional preselected id
-      memberIds={[]} // optional when using sidebar-driven selection
-      showFileUpload
-    />
-  );
-}
-
-export default App;
 ```
 
-OR Getting started using our [Basic Usage](./examples/basic-usage.tsx)
+> **Note**: You can check our Auth example for a basic UserService usage on [Auth Example](./examples/auth-example.tsx).
 
 ## Authentication
 This library does not include auth utilities. Provide your own auth and pass `currentUser` to `ChatProvider`.
@@ -529,7 +434,5 @@ MIT © [Your Name]
 
 ## 📚 Documentation
 
-- **[Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md)** - Development timeline
-- **[ReactJS Support](./REACTJS_SUPPORT.md)** - Full ReactJS integration guide
 - **[Services Documentation](./SERVICES.md)** - Detailed service API reference
 - **[Examples](./examples/)** - Live code examples
