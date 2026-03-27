@@ -214,7 +214,7 @@ export const getEncryptionStatus = async (
 ): Promise<EncryptionStatus> => {
   const isEnabled = Boolean(key);
   let isReady = false;
-  let keyGenerated = Boolean(key);
+  const keyGenerated = Boolean(key);
   let testPassed = false;
 
   if (key) {

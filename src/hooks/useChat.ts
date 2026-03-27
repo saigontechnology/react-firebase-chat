@@ -1,6 +1,6 @@
 import {useState, useEffect, useCallback} from 'react';
 import {ChatService} from '../services/chat';
-import {Message, IUser, UseChatReturn, MediaType, MessageStatus} from '../types';
+import {Message, IUser, UseChatReturn, MediaType} from '../types';
 
 export interface UseChatProps {
   user: IUser;

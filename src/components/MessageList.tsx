@@ -15,7 +15,7 @@ interface MessageItemProps {
 const MessageItem: React.FC<MessageItemProps> = ({
   message,
   isOwn,
-  showAvatar,
+  showAvatar: _showAvatar,
   showTimestamp,
   onUpdate,
   onDelete,

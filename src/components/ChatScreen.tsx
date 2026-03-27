@@ -34,7 +34,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   partners = [],
   style,
   className = "",
-  onSend,
+  onSend: _onSend,
   showFileUpload = true,
   isGroup = false,
   renderHeader,

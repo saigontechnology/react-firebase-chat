@@ -85,7 +85,7 @@ export class ChatService {
         await updateDoc(
           doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
           conversationData
-        ).catch(async (err) => {
+        ).catch(async (_err) => {
           // If doc does not exist, set it
           await setDoc(
             doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
