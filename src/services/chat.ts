@@ -12,19 +12,20 @@ import {
   onSnapshot,
   getDocs,
   getDoc,
+  serverTimestamp,
   DocumentSnapshot,
   Unsubscribe,
   increment,
 } from 'firebase/firestore';
-import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
-import {getFirebaseFirestore, getFirebaseStorage} from './firebase';
-import {UserService} from './user';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getFirebaseFirestore, getFirebaseStorage } from './firebase';
+import { UserService } from './user';
 import {
   FireStoreCollection,
   IMessage,
   MediaType,
 } from '../types';
-import {convertToLatestMessage} from '../utils/formatters';
+import { convertToLatestMessage } from '../utils/formatters';
 
 // Collections as per documentation
 export const COLLECTIONS = {
@@ -186,7 +187,7 @@ export class ChatService {
 
       const messageData = {
         ...message,
-        createdAt: Date.now(),
+        createdAt: serverTimestamp(),
       };
 
       // Add message to conversation
@@ -199,7 +200,7 @@ export class ChatService {
       await updateDoc(
         doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
         {
-          latestMessage: {...messageData, id: messageRef.id},
+          latestMessage: { ...messageData, id: messageRef.id },
           latestMessageTime: Date.now(),
           updatedAt: Date.now(),
         }
@@ -221,7 +222,7 @@ export class ChatService {
               updatedAt: Date.now(),
               latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', message.text || ''),
             },
-            {merge: true} // Merge with existing data if document exists
+            { merge: true } // Merge with existing data if document exists
           );
         });
 
@@ -251,7 +252,11 @@ export class ChatService {
         const data = doc.data();
         messages.push({
           id: doc.id,
-          createdAt: data.createdAt ? new Date(data.createdAt).valueOf() : Date.now(),
+          createdAt: data.createdAt
+            ? typeof data.createdAt.toMillis === 'function'
+              ? data.createdAt.toMillis()
+              : new Date(data.createdAt).valueOf()
+            : Date.now(),
           text: data.text,
           image: data.type === MediaType.image ? data.path : undefined,
           video: data.type === MediaType.video ? data.path : undefined,
@@ -365,7 +370,7 @@ export class ChatService {
   }
 
   // Upload file for message
-  async uploadFile(file: File, conversationId: string): Promise<{path: string; downloadURL: string}> {
+  async uploadFile(file: File, conversationId: string): Promise<{ path: string; downloadURL: string }> {
     try {
       const fileName = `${Date.now()}_${file.name}`;
       const filePath = `conversations/${conversationId}/files/${fileName}`;
@@ -425,7 +430,11 @@ export class ChatService {
         const data = doc.data();
         messages.push({
           id: doc.id,
-          createdAt: data.createdAt ? new Date(data.createdAt).valueOf() : Date.now(),
+          createdAt: data.createdAt
+            ? typeof data.createdAt.toMillis === 'function'
+              ? data.createdAt.toMillis()
+              : new Date(data.createdAt).valueOf()
+            : Date.now(),
           text: data.text,
           image: data.type === MediaType.image ? data.path : undefined,
           video: data.type === MediaType.video ? data.path : undefined,
