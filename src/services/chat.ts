@@ -360,9 +360,7 @@ export class ChatService {
   async updateUnread(conversationId: string, userId: string): Promise<void> {
     try {
       const conversationRef = doc(this.db, FireStoreCollection.users, userId, FireStoreCollection.conversations, conversationId);
-      await updateDoc(conversationRef, {
-        unRead: 0,
-      });
+      await setDoc(conversationRef, { unRead: 0 }, { merge: true });
     } catch (error) {
       console.error('Error updating unread count:', error);
       throw new Error('Failed to update unread count');
