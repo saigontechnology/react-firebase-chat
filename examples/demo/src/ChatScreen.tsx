@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IUser, ChatScreen as LibChatScreen, ChatProvider, UserService } from '@saigontechnology/react-firebase-chat';
+import { IUser, ChatScreen as LibChatScreen, ChatProvider } from '@saigontechnology/react-firebase-chat';
 
 interface Props {
   currentUser: IUser;
@@ -10,13 +10,9 @@ export default function ChatScreen({ currentUser }: Props) {
   const [recipientId, setRecipientId] = useState<string>('');
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
 
-  const handleStart = async (e: React.FormEvent) => {
+  const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
     if (!recipientId.trim()) return;
-
-    const userService = UserService.getInstance();
-    await userService.createUserIfNotExists(recipientId.trim());
-
     const ids = [currentUser.id, recipientId.trim()].sort();
     const convId = conversationId.trim() || ids.join('_');
     setActiveConversation(convId);

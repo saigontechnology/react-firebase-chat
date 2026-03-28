@@ -89,11 +89,10 @@ const encryptData = async (text: string, key: string): Promise<string> => {
       new TextEncoder().encode(text)
     );
 
-    const cipherHex = Array.from(new Uint8Array(encrypted))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+    // RN (react-native-aes-crypto) returns ciphertext as base64 — match that format
+    const cipherBase64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
 
-    return iv + cipherHex;
+    return iv + cipherBase64;
   } catch (error) {
     console.error('Encryption failed:', error);
     throw new Error('Failed to encrypt message');
@@ -112,14 +111,13 @@ const decryptData = async (cipher: string, key: string): Promise<string> => {
 
   try {
     const iv = cipher.substring(0, IV_LENGTH);
-    const encryptedHex = cipher.substring(IV_LENGTH);
+    const encryptedBase64 = cipher.substring(IV_LENGTH);
 
     const ivBytes = new Uint8Array(
       (iv.match(/.{2}/g) ?? []).map((b) => parseInt(b, 16))
     );
-    const encryptedBytes = new Uint8Array(
-      (encryptedHex.match(/.{2}/g) ?? []).map((b) => parseInt(b, 16))
-    );
+    // RN stores ciphertext as base64 — decode it
+    const encryptedBytes = Uint8Array.from(atob(encryptedBase64), (c) => c.charCodeAt(0));
     const keyBytes = new Uint8Array(
       (key.match(/.{2}/g) ?? []).map((b) => parseInt(b, 16))
     );

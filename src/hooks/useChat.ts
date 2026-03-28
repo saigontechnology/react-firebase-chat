@@ -1,8 +1,8 @@
-import {useState, useEffect, useCallback, useRef} from 'react';
-import {ChatService} from '../services/chat';
-import {Message, IUser, UseChatReturn, MediaType} from '../types';
-import {useChatContext} from '../context/ChatProvider';
-import {generateEncryptionKey, encryptData, decryptedMessageData} from '../utils/encryption';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ChatService } from '../services/chat';
+import { Message, IUser, UseChatReturn, MediaType } from '../types';
+import { useChatContext } from '../context/ChatProvider';
+import { generateEncryptionKey, encryptData, decryptedMessageData } from '../utils/encryption';
 
 export interface UseChatProps {
   user: IUser;
@@ -11,7 +11,7 @@ export interface UseChatProps {
   name?: string;
 }
 
-export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): UseChatReturn => {
+export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps): UseChatReturn => {
   const chatService = ChatService.getInstance();
   const { encryptionKey } = useChatContext();
   const derivedKeyRef = useRef<string | null>(null);
@@ -19,8 +19,8 @@ export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): 
   // Derive encryption key once per conversation
   useEffect(() => {
     if (!conversationId) return;
-    const password = encryptionKey || conversationId;
-    const salt = conversationId;
+    const password = encryptionKey || "saigontechnology@2026";
+    const salt = "saigontechnology@2026";
     generateEncryptionKey(password, { salt }).then((key) => {
       derivedKeyRef.current = key;
     });
