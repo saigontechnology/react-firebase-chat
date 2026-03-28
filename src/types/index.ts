@@ -131,8 +131,7 @@ export interface MediaFile {
 
 // Encryption options used by the library
 export interface EncryptionOptions {
-  salt?: string;
-  algorithm?: string;
+  salt: string;
   iterations?: number;
   keyLength?: number;
 }

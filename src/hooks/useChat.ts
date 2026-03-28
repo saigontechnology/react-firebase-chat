@@ -1,6 +1,8 @@
-import {useState, useEffect, useCallback} from 'react';
+import {useState, useEffect, useCallback, useRef} from 'react';
 import {ChatService} from '../services/chat';
 import {Message, IUser, UseChatReturn, MediaType} from '../types';
+import {useChatContext} from '../context/ChatProvider';
+import {generateEncryptionKey, encryptData, decryptedMessageData} from '../utils/encryption';
 
 export interface UseChatProps {
   user: IUser;
@@ -11,6 +13,18 @@ export interface UseChatProps {
 
 export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): UseChatReturn => {
   const chatService = ChatService.getInstance();
+  const { encryptionKey } = useChatContext();
+  const derivedKeyRef = useRef<string | null>(null);
+
+  // Derive encryption key once per conversation
+  useEffect(() => {
+    if (!conversationId) return;
+    const password = encryptionKey || conversationId;
+    const salt = conversationId;
+    generateEncryptionKey(password, { salt }).then((key) => {
+      derivedKeyRef.current = key;
+    });
+  }, [conversationId, encryptionKey]);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,9 +37,12 @@ export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): 
         throw new Error('No conversation selected');
       }
 
-      // Create a temporary message object that matches IMessage interface for the service
+      const encryptedText = derivedKeyRef.current
+        ? await encryptData(text, derivedKeyRef.current)
+        : text;
+
       const messageData = {
-        text,
+        text: encryptedText,
         type: MediaType.text,
         senderId: user?.id?.toString(),
         readBy: {
@@ -83,20 +100,22 @@ export const useChat = ({user, conversationId, memberIds, name}: UseChatProps): 
     setLoading(true);
     setError(null);
 
-    const unsubscribe = chatService.subscribeToMessages(conversationId, (newMessages) => {
-      // Convert IMessage to Message format
-      const convertedMessages: Message[] = newMessages.map((msg) => ({
-        id: msg.id,
-        text: msg.text || '',
-        userId: typeof msg.senderId === 'string' ? msg.senderId : '',
-        createdAt: msg.createdAt ? msg.createdAt : Date.now(),
-        type: msg.image ? 'image' : msg.audio ? 'file' : msg.video ? 'file' : msg.system ? 'system' : 'text',
-        readBy: msg.readBy ?? {},
-        metadata: msg.image ? {
-          imageUrl: msg.image,
-          fileType: 'image'
-        } : undefined,
-      }));
+    const unsubscribe = chatService.subscribeToMessages(conversationId, async (newMessages) => {
+      const key = derivedKeyRef.current;
+      const convertedMessages: Message[] = await Promise.all(
+        newMessages.map(async (msg) => ({
+          id: msg.id,
+          text: key ? await decryptedMessageData(msg.text || '', key) : (msg.text || ''),
+          userId: typeof msg.senderId === 'string' ? msg.senderId : '',
+          createdAt: msg.createdAt ? msg.createdAt : Date.now(),
+          type: msg.image ? 'image' : msg.audio ? 'file' : msg.video ? 'file' : msg.system ? 'system' : 'text',
+          readBy: msg.readBy ?? {},
+          metadata: msg.image ? {
+            imageUrl: msg.image,
+            fileType: 'image'
+          } : undefined,
+        }))
+      );
 
       setMessages(convertedMessages);
       setLoading(false);
