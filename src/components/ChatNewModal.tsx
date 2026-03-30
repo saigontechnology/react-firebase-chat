@@ -138,4 +138,6 @@ export const ChatNewModal = forwardRef<ChatNewModalRef, ChatNewModalProps>(
   }
 );
 
+ChatNewModal.displayName = 'ChatNewModal';
+
 export default ChatNewModal;

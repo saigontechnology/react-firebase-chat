@@ -43,7 +43,7 @@ export const ChatList: React.FC<ChatListProps> = ({
                 user={{
                   name: c.name,
                   id:
-                    c.members.find((m: string) => m !== currentUser?.id) || "",
+                    (c.members ?? []).find((m: string) => m !== currentUser?.id) || "",
                 }}
               />
             </div>

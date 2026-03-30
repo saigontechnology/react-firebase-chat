@@ -1,245 +1,192 @@
-import { EncryptionFunctions, EncryptionOptions, EncryptionStatus } from '../types';
+import { EncryptionOptions } from '../types';
 
-/**
- * Encryption utilities matching RN-Firebase-Chat
- */
+const DEFAULT_ITERATIONS = 10000;
+const DEFAULT_KEY_LENGTH = 256;
 
-// Default encryption options
-const DEFAULT_ENCRYPTION_OPTIONS: EncryptionOptions = {
-  algorithm: 'AES-GCM',
-  keyLength: 256,
-  iterations: 100000,
-};
+const HEX_CHARS = '0123456789abcdef';
+// IV is 16 bytes = 32 hex characters (matches rn-firebase-chat)
+const IV_LENGTH = 32;
 
-/**
- * Generate encryption key from password
- */
-export const generateKeyFromPassword = async (
-  password: string,
-  salt: string = 'defaultSalt',
-  options: EncryptionOptions = DEFAULT_ENCRYPTION_OPTIONS
-): Promise<string> => {
-  try {
-    if (!window.crypto || !window.crypto.subtle) {
-      throw new Error('Web Crypto API not available');
-    }
+// Generate a hex IV using Web Crypto random values
+const createIV = (length = IV_LENGTH): string => {
+  const array = new Uint8Array(length / 2);
+  crypto.getRandomValues(array);
 
-    const encoder = new TextEncoder();
-    const passwordBuffer = encoder.encode(password);
-    const saltBuffer = encoder.encode(salt);
-
-    // Import password as key material
-    const keyMaterial = await window.crypto.subtle.importKey(
-      'raw',
-      passwordBuffer,
-      'PBKDF2',
-      false,
-      ['deriveBits', 'deriveKey']
-    );
-
-    // Derive key
-    const key = await window.crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: saltBuffer,
-        iterations: options.iterations || DEFAULT_ENCRYPTION_OPTIONS.iterations!,
-        hash: 'SHA-256',
-      },
-      keyMaterial,
-      {
-        name: options.algorithm || DEFAULT_ENCRYPTION_OPTIONS.algorithm!,
-        length: options.keyLength || DEFAULT_ENCRYPTION_OPTIONS.keyLength!,
-      },
-      true,
-      ['encrypt', 'decrypt']
-    );
-
-    // Export key as base64
-    const exportedKey = await window.crypto.subtle.exportKey('raw', key);
-    return btoa(String.fromCharCode(...new Uint8Array(exportedKey)));
-  } catch (error) {
-    console.error('Error generating encryption key:', error);
-    throw new Error('Failed to generate encryption key');
+  let result = '';
+  for (let i = 0; i < array.length; i++) {
+    const byte = array[i] ?? 0;
+    result += HEX_CHARS.charAt(byte >> 4);
+    result += HEX_CHARS.charAt(byte & 0x0f);
   }
+  return result;
 };
 
-/**
- * Encrypt text using AES-GCM
- */
-export const encryptText = async (
-  text: string,
-  keyString: string,
-  options: EncryptionOptions = DEFAULT_ENCRYPTION_OPTIONS
+// Derive a hex key from password + salt using PBKDF2/SHA-256 (AES-256-CBC)
+const generateKey = async (
+  password: string,
+  salt: string,
+  cost: number,
+  length: number
 ): Promise<string> => {
+  if (!password || !salt) {
+    throw new Error('Password and salt are required for key generation');
+  }
+
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode(salt),
+      iterations: cost,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-CBC', length },
+    true,
+    ['encrypt', 'decrypt']
+  );
+
+  const raw = await crypto.subtle.exportKey('raw', key);
+  return Array.from(new Uint8Array(raw))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+// Encrypt text with AES-256-CBC; returns hex IV prepended to hex ciphertext
+const encryptData = async (text: string, key: string): Promise<string> => {
+  if (!text || !key) {
+    throw new Error('Text and key are required for encryption');
+  }
+
   try {
-    if (!window.crypto || !window.crypto.subtle) {
-      throw new Error('Web Crypto API not available');
-    }
+    const iv = createIV();
+    const ivBytes = new Uint8Array(
+      (iv.match(/.{2}/g) ?? []).map((b) => parseInt(b, 16))
+    );
+    const keyBytes = new Uint8Array(
+      (key.match(/.{2}/g) ?? []).map((b) => parseInt(b, 16))
+    );
 
-    const encoder = new TextEncoder();
-    const data = encoder.encode(text);
-
-    // Convert base64 key back to CryptoKey
-    const keyBuffer = Uint8Array.from(atob(keyString), c => c.charCodeAt(0));
-    const key = await window.crypto.subtle.importKey(
+    const cryptoKey = await crypto.subtle.importKey(
       'raw',
-      keyBuffer,
-      {
-        name: options.algorithm || DEFAULT_ENCRYPTION_OPTIONS.algorithm!,
-        length: options.keyLength || DEFAULT_ENCRYPTION_OPTIONS.keyLength!,
-      },
+      keyBytes,
+      { name: 'AES-CBC' },
       false,
       ['encrypt']
     );
 
-    // Generate random IV
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-
-    // Encrypt data
-    const encrypted = await window.crypto.subtle.encrypt(
-      {
-        name: options.algorithm || DEFAULT_ENCRYPTION_OPTIONS.algorithm!,
-        iv: iv,
-      },
-      key,
-      data
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-CBC', iv: ivBytes },
+      cryptoKey,
+      new TextEncoder().encode(text)
     );
 
-    // Combine IV and encrypted data
-    const combined = new Uint8Array(iv.length + encrypted.byteLength);
-    combined.set(iv);
-    combined.set(new Uint8Array(encrypted), iv.length);
+    // RN (react-native-aes-crypto) returns ciphertext as base64 — match that format
+    const cipherBase64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
 
-    // Return as base64
-    return btoa(String.fromCharCode(...combined));
+    return iv + cipherBase64;
   } catch (error) {
-    console.error('Error encrypting text:', error);
-    throw new Error('Failed to encrypt text');
+    console.error('Encryption failed:', error);
+    throw new Error('Failed to encrypt message');
   }
 };
 
-/**
- * Decrypt text using AES-GCM
- */
-export const decryptText = async (
-  encryptedText: string,
-  keyString: string,
-  options: EncryptionOptions = DEFAULT_ENCRYPTION_OPTIONS
-): Promise<string> => {
+// Decrypt: extract hex IV prefix then AES-256-CBC decrypt
+const decryptData = async (cipher: string, key: string): Promise<string> => {
+  if (!cipher || !key) {
+    throw new Error('Cipher and key are required for decryption');
+  }
+
+  if (cipher.length < IV_LENGTH) {
+    throw new Error('Invalid cipher format');
+  }
+
   try {
-    if (!window.crypto || !window.crypto.subtle) {
-      throw new Error('Web Crypto API not available');
-    }
+    const iv = cipher.substring(0, IV_LENGTH);
+    const encryptedBase64 = cipher.substring(IV_LENGTH);
 
-    // Decode base64
-    const combined = Uint8Array.from(atob(encryptedText), c => c.charCodeAt(0));
+    const ivBytes = new Uint8Array(
+      (iv.match(/.{2}/g) ?? []).map((b) => parseInt(b, 16))
+    );
+    // RN stores ciphertext as base64 — decode it
+    const encryptedBytes = Uint8Array.from(atob(encryptedBase64), (c) => c.charCodeAt(0));
+    const keyBytes = new Uint8Array(
+      (key.match(/.{2}/g) ?? []).map((b) => parseInt(b, 16))
+    );
 
-    // Extract IV and encrypted data
-    const iv = combined.slice(0, 12);
-    const encrypted = combined.slice(12);
-
-    // Convert base64 key back to CryptoKey
-    const keyBuffer = Uint8Array.from(atob(keyString), c => c.charCodeAt(0));
-    const key = await window.crypto.subtle.importKey(
+    const cryptoKey = await crypto.subtle.importKey(
       'raw',
-      keyBuffer,
-      {
-        name: options.algorithm || DEFAULT_ENCRYPTION_OPTIONS.algorithm!,
-        length: options.keyLength || DEFAULT_ENCRYPTION_OPTIONS.keyLength!,
-      },
+      keyBytes,
+      { name: 'AES-CBC' },
       false,
       ['decrypt']
     );
 
-    // Decrypt data
-    const decrypted = await window.crypto.subtle.decrypt(
-      {
-        name: options.algorithm || DEFAULT_ENCRYPTION_OPTIONS.algorithm!,
-        iv: iv,
-      },
-      key,
-      encrypted
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-CBC', iv: ivBytes },
+      cryptoKey,
+      encryptedBytes
     );
 
-    // Convert back to string
-    const decoder = new TextDecoder();
-    return decoder.decode(decrypted);
-  } catch (error) {
-    console.error('Error decrypting text:', error);
-    throw new Error('Failed to decrypt text');
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    throw new Error('Failed to decrypt message');
   }
 };
 
-/**
- * Test encryption/decryption functionality
- */
-export const testEncryption = async (
-  key: string,
-  options: EncryptionOptions = DEFAULT_ENCRYPTION_OPTIONS
-): Promise<boolean> => {
+// High-level key generation matching rn-firebase-chat's generateEncryptionKey
+const generateEncryptionKey = async (
+  encryptKey: string,
+  options: EncryptionOptions
+): Promise<string> => {
+  const {
+    salt,
+    iterations = DEFAULT_ITERATIONS,
+    keyLength = DEFAULT_KEY_LENGTH,
+  } = options;
+
   try {
-    const testMessage = 'test_message_' + Date.now();
-    const encrypted = await encryptText(testMessage, key, options);
-    const decrypted = await decryptText(encrypted, key, options);
-    return decrypted === testMessage;
+    return await generateKey(encryptKey, salt, iterations, keyLength);
   } catch (error) {
-    console.error('Encryption test failed:', error);
-    return false;
+    console.error('Error generating encryption key:', error);
+    throw error;
   }
 };
 
-/**
- * Create encryption functions object matching RN interface
- */
-export const createEncryptionFunctions = (
-  key: string,
-  options: EncryptionOptions = DEFAULT_ENCRYPTION_OPTIONS
-): EncryptionFunctions => {
-  return {
-    generateKeyFunctionProp: async (password: string) =>
-      generateKeyFromPassword(password, 'defaultSalt', options),
-    encryptFunctionProp: async (text: string) =>
-      encryptText(text, key, options),
-    decryptFunctionProp: async (text: string) =>
-      decryptText(text, key, options),
-  };
-};
-
-/**
- * Check encryption status
- */
-export const getEncryptionStatus = async (
-  key?: string,
-  options: EncryptionOptions = DEFAULT_ENCRYPTION_OPTIONS
-): Promise<EncryptionStatus> => {
-  const isEnabled = Boolean(key);
-  let isReady = false;
-  let keyGenerated = Boolean(key);
-  let testPassed = false;
-
-  if (key) {
-    try {
-      isReady = Boolean(window.crypto && window.crypto.subtle);
-      if (isReady) {
-        testPassed = await testEncryption(key, options);
-      }
-    } catch (error) {
-      console.error('Error checking encryption status:', error);
-    }
+// Safe decrypt with fallback — matches rn-firebase-chat's decryptedMessageData
+const decryptedMessageData = async (
+  text: string,
+  key: string
+): Promise<string> => {
+  if (!text || !key) {
+    return text;
   }
 
-  return {
-    isEnabled,
-    isReady,
-    keyGenerated,
-    testPassed,
-    lastTestedAt: Date.now(),
-  };
+  if (text.length <= IV_LENGTH) {
+    return text;
+  }
+
+  try {
+    const decryptedMessage = await decryptData(text, key);
+    return decryptedMessage || text;
+  } catch {
+    return text;
+  }
 };
 
-/**
- * Check if encryption is supported in current environment
- */
-export const isEncryptionSupported = (): boolean => {
-  return Boolean(window.crypto && window.crypto.subtle);
+export {
+  generateKey,
+  encryptData,
+  decryptData,
+  createIV,
+  generateEncryptionKey,
+  decryptedMessageData,
 };

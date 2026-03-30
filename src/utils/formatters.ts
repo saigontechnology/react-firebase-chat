@@ -55,9 +55,10 @@ export const formatMessageText = (message: MessageProps): string => {
     case MediaType.video:
       return '🎥 Video';
 
-    case MediaType.file:
+    case MediaType.file: {
       const fileName = message.path?.split('/').pop() || 'File';
       return `📎 ${fileName}`;
+    }
 
     case MediaType.system:
       return message.text || 'System message';

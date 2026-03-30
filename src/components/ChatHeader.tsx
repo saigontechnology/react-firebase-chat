@@ -7,7 +7,7 @@ export interface ChatHeaderProps {
   rightExtras?: React.ReactNode;
 }
 
-export const ChatHeader: React.FC<ChatHeaderProps> = ({ currentUser, onLogout, rightExtras }) => {
+export const ChatHeader: React.FC<ChatHeaderProps> = ({ currentUser, onLogout: _onLogout, rightExtras }) => {
   return (
     <div className="app-header">
       <div className="header-left" />

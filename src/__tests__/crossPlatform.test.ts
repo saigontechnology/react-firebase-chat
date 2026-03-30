@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/ban-types, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Integration tests for cross-platform communication
  * Testing real-time sync between ReactJS web and React Native mobile
@@ -7,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { act } from '@testing-library/react';
 import { ChatService } from '../services/chat';
-import { IMessage, IConversation, IUser } from '../types';
+import { IMessage, IUser } from '../types';
 
 // Mock Firebase for testing
 jest.mock('firebase/firestore', () => ({
