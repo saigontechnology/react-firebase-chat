@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatService } from '../services/chat';
-import { Message, IUser, UseChatReturn, MediaType } from '../types';
+import { Message, IMessage, IUser, UseChatReturn, MediaType } from '../types';
 import { useChatContext } from '../context/ChatProvider';
 import { encryptData, decryptedMessageData } from '../utils/encryption';
 
@@ -11,13 +11,66 @@ export interface UseChatProps {
   name?: string;
 }
 
+const convertMessages = async (rawMessages: IMessage[], key: string | null): Promise<Message[]> =>
+  Promise.all(
+    rawMessages.map(async (msg) => ({
+      id: msg.id,
+      text: key ? await decryptedMessageData(msg.text || '', key) : (msg.text || ''),
+      userId: typeof msg.senderId === 'string' ? msg.senderId : '',
+      createdAt: msg.createdAt ? msg.createdAt : Date.now(),
+      type: msg.system ? 'system' :
+        msg.image ? 'image' :
+          msg.audio || msg.video ? 'file' :
+            'text',
+      readBy: msg.readBy ?? {},
+      metadata: msg.image ? { imageUrl: msg.image, fileType: 'image' } : undefined,
+    }))
+  );
+
 export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps): UseChatReturn => {
   const chatService = ChatService.getInstance();
   const { derivedKey } = useChatContext();
 
+  // Keep a ref so callbacks always read the latest key without being in deps
+  const derivedKeyRef = useRef(derivedKey);
+  useEffect(() => {
+    derivedKeyRef.current = derivedKey;
+  }, [derivedKey]);
+
+  // Cache raw (encrypted) messages so we can re-decrypt when the key arrives
+  const rawMessagesRef = useRef<IMessage[]>([]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Re-decrypt cached messages when derivedKey first resolves
+  useEffect(() => {
+    if (!derivedKey || rawMessagesRef.current.length === 0) return;
+    convertMessages(rawMessagesRef.current, derivedKey).then(setMessages);
+  }, [derivedKey]);
+
+  // Stable subscription — never torn down unless conversationId changes
+  useEffect(() => {
+    if (!conversationId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const unsubscribe = chatService.subscribeToMessages(conversationId, async (newMessages) => {
+      rawMessagesRef.current = newMessages;
+      const converted = await convertMessages(newMessages, derivedKeyRef.current);
+      setMessages(converted);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [conversationId, chatService]);
 
   // Send a text message
   const sendMessage = useCallback(async (text: string) => {
@@ -26,8 +79,8 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
         throw new Error('No conversation selected');
       }
 
-      const encryptedText = derivedKey
-        ? await encryptData(text, derivedKey)
+      const encryptedText = derivedKeyRef.current
+        ? await encryptData(text, derivedKeyRef.current)
         : text;
 
       const messageData = {
@@ -50,7 +103,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
       setError(err instanceof Error ? err.message : 'Failed to send message');
       throw err;
     }
-  }, [conversationId, user?.id, chatService, memberIds]);
+  }, [conversationId, user?.id, user?.name, chatService, memberIds, name]);
 
   // Delete a message
   const deleteMessage = useCallback(async (messageId: string) => {
@@ -78,42 +131,6 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
       throw err;
     }
   }, [conversationId, user.id]);
-
-  // Subscribe to messages
-  useEffect(() => {
-    if (!conversationId) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const unsubscribe = chatService.subscribeToMessages(conversationId, async (newMessages) => {
-      const key = derivedKey;
-      const convertedMessages: Message[] = await Promise.all(
-        newMessages.map(async (msg) => ({
-          id: msg.id,
-          text: key ? await decryptedMessageData(msg.text || '', key) : (msg.text || ''),
-          userId: typeof msg.senderId === 'string' ? msg.senderId : '',
-          createdAt: msg.createdAt ? msg.createdAt : Date.now(),
-          type: msg.image ? 'image' : msg.audio ? 'file' : msg.video ? 'file' : msg.system ? 'system' : 'text',
-          readBy: msg.readBy ?? {},
-          metadata: msg.image ? {
-            imageUrl: msg.image,
-            fileType: 'image'
-          } : undefined,
-        }))
-      );
-
-      setMessages(convertedMessages);
-      setLoading(false);
-    });
-
-    return () => {
-      unsubscribe?.();
-    };
-  }, [conversationId, chatService, derivedKey]);
 
   return {
     messages,

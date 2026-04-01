@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useRef,
   useState,
+  useMemo,
 } from "react";
 import { initializeFirebase, firebaseService } from "../services/firebase";
 import { FirebaseConfig, IUser } from "../types";
@@ -66,12 +67,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     generateEncryptionKey(password, { salt: "saigontechnology@2026" }).then(setDerivedKey);
   }, [encryptionKey]);
 
-  const value: ChatContextValue = {
-    currentUser,
-    firebaseConfig,
-    encryptionKey,
-    derivedKey,
-  };
+  const value = useMemo<ChatContextValue>(
+    () => ({ currentUser, firebaseConfig, encryptionKey, derivedKey }),
+    [currentUser, firebaseConfig, encryptionKey, derivedKey]
+  );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
