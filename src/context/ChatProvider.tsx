@@ -4,15 +4,18 @@ import React, {
   ReactNode,
   useEffect,
   useRef,
+  useState,
 } from "react";
 import { initializeFirebase, firebaseService } from "../services/firebase";
 import { FirebaseConfig, IUser } from "../types";
 import UserService from "../services/user";
+import { generateEncryptionKey } from "../utils/encryption";
 
 export interface ChatContextValue {
   currentUser: IUser;
   firebaseConfig?: FirebaseConfig;
   encryptionKey?: string;
+  derivedKey: string | null;
 }
 
 export interface ChatProviderProps {
@@ -31,6 +34,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
   encryptionKey,
 }) => {
   const userServiceRef = useRef(UserService.getInstance());
+  const [derivedKey, setDerivedKey] = useState<string | null>(null);
+
   useEffect(() => {
     if (firebaseService.isInitialized() || !firebaseConfig) {
       return;
@@ -56,10 +61,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     }
   }, [currentUser]);
 
+  useEffect(() => {
+    const password = encryptionKey || "saigontechnology@2026";
+    generateEncryptionKey(password, { salt: "saigontechnology@2026" }).then(setDerivedKey);
+  }, [encryptionKey]);
+
   const value: ChatContextValue = {
     currentUser,
     firebaseConfig,
     encryptionKey,
+    derivedKey,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

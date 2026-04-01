@@ -11,6 +11,7 @@ import { ButtonMaterialIcon } from "./ButtonMaterialIcon";
 import "./ChatScreen.css";
 import { ChatHeader } from "./ChatHeader";
 import { generateConversationId } from "../utils/conversation";
+import { decryptedMessageData } from "../utils/encryption";
 import ChatList, { ChatListProps } from "./ChatList";
 import { ChatNewModal, ChatNewModalRef } from "./ChatNewModal";
 
@@ -41,7 +42,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   renderChatList,
   renderChatNewModal,
 }) => {
-  const { currentUser } = useChatContext();
+  const { currentUser, derivedKey } = useChatContext();
   const [showUploader, setShowUploader] = useState(false);
 
   const chatNewModalRef = useRef<ChatNewModalRef>(null);
@@ -94,18 +95,31 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     if (!currentUser?.id) return;
     const unsubscribe = chatService.subscribeToUserConversations(
       `${currentUser.id}`,
-      (items) => {
-        setConversations(items);
+      async (items) => {
+        const key = derivedKey;
+        const decrypted = await Promise.all(
+          items.map(async (c) => {
+            if (!c.latestMessage?.text || !key) return c;
+            return {
+              ...c,
+              latestMessage: {
+                ...c.latestMessage,
+                text: await decryptedMessageData(c.latestMessage.text, key),
+              },
+            };
+          })
+        );
+        setConversations(decrypted);
         // If nothing selected, pick first
-        if (!selectedConversationId && items.length > 0) {
-          setSelectedConversationId(items[0].id);
-          setSelectedName(items[0].name || "");
+        if (!selectedConversationId && decrypted.length > 0) {
+          setSelectedConversationId(decrypted[0].id);
+          setSelectedName(decrypted[0].name || "");
         }
       }
     );
     return () => unsubscribe?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]);
+  }, [currentUser?.id, derivedKey]);
 
   useEffect(() => {
     if (selectedConversationId) {

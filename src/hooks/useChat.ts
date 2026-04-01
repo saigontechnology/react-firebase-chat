@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChatService } from '../services/chat';
 import { Message, IUser, UseChatReturn, MediaType } from '../types';
 import { useChatContext } from '../context/ChatProvider';
-import { generateEncryptionKey, encryptData, decryptedMessageData } from '../utils/encryption';
+import { encryptData, decryptedMessageData } from '../utils/encryption';
 
 export interface UseChatProps {
   user: IUser;
@@ -13,18 +13,7 @@ export interface UseChatProps {
 
 export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps): UseChatReturn => {
   const chatService = ChatService.getInstance();
-  const { encryptionKey } = useChatContext();
-  const derivedKeyRef = useRef<string | null>(null);
-
-  // Derive encryption key once per conversation
-  useEffect(() => {
-    if (!conversationId) return;
-    const password = encryptionKey || "saigontechnology@2026";
-    const salt = "saigontechnology@2026";
-    generateEncryptionKey(password, { salt }).then((key) => {
-      derivedKeyRef.current = key;
-    });
-  }, [conversationId, encryptionKey]);
+  const { derivedKey } = useChatContext();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +26,8 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
         throw new Error('No conversation selected');
       }
 
-      const encryptedText = derivedKeyRef.current
-        ? await encryptData(text, derivedKeyRef.current)
+      const encryptedText = derivedKey
+        ? await encryptData(text, derivedKey)
         : text;
 
       const messageData = {
@@ -101,7 +90,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
     setError(null);
 
     const unsubscribe = chatService.subscribeToMessages(conversationId, async (newMessages) => {
-      const key = derivedKeyRef.current;
+      const key = derivedKey;
       const convertedMessages: Message[] = await Promise.all(
         newMessages.map(async (msg) => ({
           id: msg.id,
@@ -124,7 +113,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
     return () => {
       unsubscribe?.();
     };
-  }, [conversationId, chatService]);
+  }, [conversationId, chatService, derivedKey]);
 
   return {
     messages,
