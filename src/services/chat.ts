@@ -212,7 +212,10 @@ export class ChatService {
       );
 
       if (conversationDoc.exists()) {
-        const updatePromises = memberIds.map(async (memberId: string) => {
+        // Use members from the conversation document so all participants are updated,
+        // regardless of what memberIds was passed by the caller
+        const allMembers: string[] = conversationDoc.data()?.members || memberIds;
+        const updatePromises = allMembers.map(async (memberId: string) => {
           const isSender = memberId === message.senderId;
           // Update unread count in user's conversations subcollection
           await setDoc(

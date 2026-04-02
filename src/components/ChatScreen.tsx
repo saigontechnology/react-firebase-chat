@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { TypingIndicator } from "./TypingIndicator";
@@ -11,6 +11,7 @@ import { ButtonMaterialIcon } from "./ButtonMaterialIcon";
 import "./ChatScreen.css";
 import { ChatHeader } from "./ChatHeader";
 import { generateConversationId } from "../utils/conversation";
+import { decryptedMessageData } from "../utils/encryption";
 import ChatList, { ChatListProps } from "./ChatList";
 import { ChatNewModal, ChatNewModalRef } from "./ChatNewModal";
 
@@ -41,15 +42,21 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   renderChatList,
   renderChatNewModal,
 }) => {
-  const { currentUser } = useChatContext();
+  const { currentUser, derivedKey } = useChatContext();
   const [showUploader, setShowUploader] = useState(false);
 
   const chatNewModalRef = useRef<ChatNewModalRef>(null);
 
+  // Keep a ref so the subscription callback always reads the latest key
+  const derivedKeyRef = useRef(derivedKey);
+  useEffect(() => {
+    derivedKeyRef.current = derivedKey;
+  }, [derivedKey]);
+
   // Conversations list from users/{userId}/conversations
-  const [conversations, setConversations] = useState<Array<ConversationProps>>(
-    []
-  );
+  const [conversations, setConversations] = useState<Array<ConversationProps>>([]);
+  const rawConversationsRef = useRef<ConversationProps[]>([]);
+
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | undefined
   >(conversationId);
@@ -59,47 +66,77 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const [selectedPartners, setSelectedPartners] =
     useState<Array<IUser>>(partners);
 
+  const memberIds = useMemo(
+    () => [...new Set([`${currentUser.id}`, ...selectedPartners.map((p) => p.id)])],
+    [currentUser.id, selectedPartners]
+  );
+
+  const chatName = useMemo(
+    () =>
+      isGroup
+        ? `group_${currentUser.name},${selectedPartners.map((p) => p.name).join(",")}`
+        : selectedPartners.find((p) => p.id !== currentUser.id)?.name || selectedName,
+    [isGroup, currentUser.id, selectedPartners, selectedName]
+  );
+
   const { messages, loading, error, sendMessage, markAsRead } = useChat({
     user: currentUser,
     conversationId: selectedConversationId || conversationId,
-    memberIds: [
-      ...new Set([
-        `${currentUser.id}`,
-        ...selectedPartners.map((partner) => partner.id),
-      ]),
-    ],
-    name: isGroup
-      ? `group_${currentUser.id},${selectedPartners
-          .map((partner) => partner.name)
-          .join(",")}`
-      : selectedPartners.find((partner) => partner.id !== currentUser.id)
-          ?.name || selectedName,
+    memberIds,
+    name: chatName,
   });
 
-  const convertedUser: IUser = currentUser
-    ? {
-        id: currentUser.id.toString(),
-        name: currentUser.name || "Unknown User",
-        avatar: currentUser.avatar,
-      }
-    : {
-        id: "",
-        name: "Unknown User",
-        avatar: undefined,
-      };
+  const convertedUser = useMemo<IUser>(
+    () =>
+      currentUser
+        ? { id: currentUser.id.toString(), name: currentUser.name || "Unknown User", avatar: currentUser.avatar }
+        : { id: "", name: "Unknown User", avatar: undefined },
+    [currentUser]
+  );
 
-  // Subscribe to user conversations for sidebar
+  // Re-decrypt cached conversations when derivedKey first resolves
+  useEffect(() => {
+    if (!derivedKey || rawConversationsRef.current.length === 0) return;
+    Promise.all(
+      rawConversationsRef.current.map(async (c) => {
+        if (!c.latestMessage?.text) return c;
+        return {
+          ...c,
+          latestMessage: {
+            ...c.latestMessage,
+            text: await decryptedMessageData(c.latestMessage.text, derivedKey),
+          },
+        };
+      })
+    ).then(setConversations);
+  }, [derivedKey]);
+
+  // Stable subscription — never torn down unless currentUser changes
   useEffect(() => {
     const chatService = ChatService.getInstance();
     if (!currentUser?.id) return;
     const unsubscribe = chatService.subscribeToUserConversations(
       `${currentUser.id}`,
-      (items) => {
-        setConversations(items);
+      async (items) => {
+        rawConversationsRef.current = items;
+        const key = derivedKeyRef.current;
+        const decrypted = await Promise.all(
+          items.map(async (c) => {
+            if (!c.latestMessage?.text || !key) return c;
+            return {
+              ...c,
+              latestMessage: {
+                ...c.latestMessage,
+                text: await decryptedMessageData(c.latestMessage.text, key),
+              },
+            };
+          })
+        );
+        setConversations(decrypted);
         // If nothing selected, pick first
-        if (!selectedConversationId && items.length > 0) {
-          setSelectedConversationId(items[0].id);
-          setSelectedName(items[0].name || "");
+        if (!selectedConversationId && decrypted.length > 0) {
+          setSelectedConversationId(decrypted[0].id);
+          setSelectedName(decrypted[0].name || "");
         }
       }
     );
@@ -181,7 +218,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           .map((m: string) => ({ id: m }))
       );
     },
-    []
+    [currentUser?.id]
   );
 
   // Do not block the whole screen while loading a conversation

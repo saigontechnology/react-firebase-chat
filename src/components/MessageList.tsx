@@ -12,13 +12,14 @@ interface MessageItemProps {
   onDelete?: (messageId: string) => void;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({
+const MessageItem: React.FC<MessageItemProps> = React.memo(({
   message,
   isOwn,
   showAvatar: _showAvatar,
   showTimestamp,
   onUpdate,
   onDelete,
+// eslint-disable-next-line react/display-name
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
@@ -176,7 +177,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
       )}
     </motion.div>
   );
-};
+});
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
