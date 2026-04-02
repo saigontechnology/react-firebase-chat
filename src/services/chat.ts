@@ -201,8 +201,8 @@ export class ChatService {
         doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
         {
           latestMessage: { ...messageData, id: messageRef.id },
-          latestMessageTime: Date.now(),
-          updatedAt: Date.now(),
+          latestMessageTime: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         }
       );
 
@@ -303,8 +303,10 @@ export class ChatService {
         userConversations.push({
           id: doc.id,
           ...data,
-          updatedAt: data.updatedAt ? new Date(data.updatedAt).valueOf() : Date.now(),
-          joinedAt: data.joinedAt ? new Date(data.joinedAt).valueOf() : Date.now(),
+          members: data.members || [],
+          updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? Date.now(),
+          joinedAt: data.createdAt?.toMillis?.() ?? data.createdAt ?? Date.now(),
+          latestMessage: data.latestMessage || undefined,
         });
       });
       callback(userConversations);
