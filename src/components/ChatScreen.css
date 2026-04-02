@@ -191,6 +191,13 @@
   background: #22c55e;
 }
 
+.conversation-time {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .conversation-last {
   color: #6b7280;
   font-size: 12px;
