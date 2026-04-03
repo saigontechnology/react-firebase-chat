@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatService } from '../services/chat';
 import { TypingUser, UseTypingReturn } from '../types';
+import { DEFAULT_TYPING_TIMEOUT_SECONDS } from '../utils/constants';
 
-export const useTyping = (roomId: string, userId: string): UseTypingReturn => {
+export const useTyping = (
+  roomId: string,
+  userId: string,
+  typingTimeoutSeconds: number = DEFAULT_TYPING_TIMEOUT_SECONDS
+): UseTypingReturn => {
   const chatService = ChatService.getInstance();
 
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -18,7 +23,7 @@ export const useTyping = (roomId: string, userId: string): UseTypingReturn => {
         .filter(([uid, isTyping]) => uid !== userId && isTyping)
         .map(([uid]) => ({
           uid,
-          displayName: `User ${uid}`, // We'd need to get actual user data
+          displayName: `User ${uid}`,
           timestamp: Date.now(),
         }));
 
@@ -44,17 +49,17 @@ export const useTyping = (roomId: string, userId: string): UseTypingReturn => {
         isTypingRef.current = true;
       }
 
-      // Set timeout to stop typing indicator
+      // Set timeout to stop typing indicator (configurable)
       typingTimeoutRef.current = setTimeout(() => {
         chatService.updateTypingStatus(roomId, userId, false);
         isTypingRef.current = false;
-      }, 3000); // Stop typing after 3 seconds of inactivity
+      }, typingTimeoutSeconds);
     } else {
       // Immediately stop typing
       chatService.updateTypingStatus(roomId, userId, false);
       isTypingRef.current = false;
     }
-  }, [roomId, userId]);
+  }, [roomId, userId, typingTimeoutSeconds]);
 
   // Cleanup on unmount
   useEffect(() => {

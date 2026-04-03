@@ -1,6 +1,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { UserAvatarProps } from '../types';
+import { randomColor } from '../utils/color';
 
 const sizeClasses = {
   small: 'w-8 h-8 text-xs',
@@ -23,13 +24,17 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       .slice(0, 2)
     : '?';
 
+  // Deterministic color from user name/id (matching rn-firebase-chat)
+  const avatarColor = randomColor(user.name || user.id || 'default');
+
   return (
     <div className={clsx('relative inline-block', className)}>
       <div
         className={clsx(
-          'rounded-full flex items-center justify-center font-medium text-white bg-gradient-to-br from-blue-500 to-purple-600 overflow-hidden',
+          'rounded-full flex items-center justify-center font-medium text-white overflow-hidden',
           sizeClasses[size]
         )}
+        style={user.avatar ? undefined : { backgroundColor: avatarColor }}
       >
         {user.avatar ? (
           <img

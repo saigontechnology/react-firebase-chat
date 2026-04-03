@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { MessageInputProps } from '../types';
 import { ButtonMaterialIcon } from './ButtonMaterialIcon';
+import { MAX_INPUT_LENGTH } from '../utils/constants';
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
@@ -9,6 +10,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   placeholder = 'Type a message...',
   className = '',
+  maxInputLength = MAX_INPUT_LENGTH,
 }) => {
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -16,7 +18,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const typingTimeoutRef = useRef<number | null>(null);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
+    let value = e.target.value;
+
+    // Enforce max input length (matching rn-firebase-chat)
+    if (maxInputLength && value.length > maxInputLength) {
+      value = value.slice(0, maxInputLength);
+    }
+
     setMessage(value);
 
     // Handle typing indicator
@@ -37,7 +45,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         onTyping(false);
       }, 1000);
     }
-  }, [onTyping, isTyping]);
+  }, [onTyping, isTyping, maxInputLength]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -70,7 +78,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [message, disabled, onSendMessage, isTyping, onTyping]);
 
   const handlePaste = useCallback((_e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    // No max length enforcement
+    // Paste is allowed — max length is enforced on change
   }, []);
 
   return (

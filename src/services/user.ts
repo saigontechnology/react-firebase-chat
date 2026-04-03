@@ -63,6 +63,21 @@ export class UserService {
   }
 
   /**
+   * Get a single user by ID
+   */
+  async getUserById(userId: string): Promise<IUserInfo | null> {
+    try {
+      const userDoc = await getDoc(doc(this.db, FireStoreCollection.users, userId));
+      if (!userDoc.exists()) return null;
+      const data = userDoc.data() as Partial<IUserInfo> | undefined;
+      return { id: userDoc.id, name: data?.name || '', avatar: data?.avatar };
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get a list of all users in the users collection
    */
   async getAllUsers(): Promise<IUserInfo[]> {
