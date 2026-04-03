@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -12,6 +13,7 @@ interface MessageItemProps {
   onDelete?: (messageId: string) => void;
 }
 
+// eslint-disable-next-line react/display-name
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
   message,
   isOwn,
@@ -19,7 +21,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
   showTimestamp,
   onUpdate,
   onDelete,
-// eslint-disable-next-line react/display-name
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
