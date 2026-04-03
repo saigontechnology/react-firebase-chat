@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, setDoc, QuerySnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, QuerySnapshot, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase';
 import { FireStoreCollection, IUserInfo, UserProfileProps } from '../types';
 
@@ -50,8 +50,8 @@ export class UserService {
       if (!exists) {
         await setDoc(doc(this.db, FireStoreCollection.users, userId), {
           id: userId,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
           ...userData,
         });
         console.log(`User document ${userId} created successfully.`);

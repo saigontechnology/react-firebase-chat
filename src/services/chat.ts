@@ -71,8 +71,8 @@ export class ChatService {
         members: memberIds,
         type,
         name: otherName || '',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         latestMessage: null,
         latestMessageTime: null,
         createdBy: initiatorId
@@ -113,9 +113,9 @@ export class ChatService {
         await setDoc(
           doc(this.db, COLLECTIONS.USERS, memberId, COLLECTIONS.CONVERSATIONS, docRefId),
           {
-            joinedAt: Date.now(),
+            joinedAt: serverTimestamp(),
             unRead: 0,
-            updatedAt: Date.now(),
+            updatedAt: serverTimestamp(),
             members: memberIds,
             name: chatName || '',
           }
@@ -201,8 +201,8 @@ export class ChatService {
         doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
         {
           latestMessage: { ...messageData, id: messageRef.id },
-          latestMessageTime: Date.now(),
-          updatedAt: Date.now(),
+          latestMessageTime: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         }
       );
 
@@ -222,7 +222,7 @@ export class ChatService {
             doc(this.db, COLLECTIONS.USERS, memberId, COLLECTIONS.CONVERSATIONS, conversationId),
             {
               unRead: increment(isSender ? 0 : 1),
-              updatedAt: Date.now(),
+              updatedAt: serverTimestamp(),
               latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', message.text || ''),
             },
             { merge: true } // Merge with existing data if document exists
@@ -303,8 +303,10 @@ export class ChatService {
         userConversations.push({
           id: doc.id,
           ...data,
-          updatedAt: data.updatedAt ? new Date(data.updatedAt).valueOf() : Date.now(),
-          joinedAt: data.joinedAt ? new Date(data.joinedAt).valueOf() : Date.now(),
+          members: data.members || [],
+          updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? Date.now(),
+          joinedAt: data.createdAt?.toMillis?.() ?? data.createdAt ?? Date.now(),
+          latestMessage: data.latestMessage || undefined,
         });
       });
       callback(userConversations);
@@ -321,12 +323,12 @@ export class ChatService {
       if (isTyping) {
         await updateDoc(typingDocRef, {
           [`${userId}`]: true,
-          updatedAt: Date.now(),
+          updatedAt: serverTimestamp(),
         });
       } else {
         await updateDoc(typingDocRef, {
           [`${userId}`]: false,
-          updatedAt: Date.now(),
+          updatedAt: serverTimestamp(),
         });
       }
     } catch (error) {

@@ -1,8 +1,17 @@
 import React from "react";
+import { format, isToday, isYesterday } from "date-fns";
 import { UserAvatar } from "./UserAvatar";
 import { ConversationProps } from "../types";
 import { useChatContext } from "../context/ChatProvider";
 import "./ChatScreen.css";
+
+const formatConversationTime = (ts?: number): string => {
+  if (!ts) return "";
+  const date = new Date(ts);
+  if (isToday(date)) return format(date, "h:mm a");
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "MMM d");
+};
 
 export interface ChatListProps {
   openNewChatFunc: () => void;
@@ -50,11 +59,7 @@ export const ChatList: React.FC<ChatListProps> = ({
             <div className="conversation-meta">
               <div className="conversation-top">
                 <span className="conversation-name">{c.name || "Unknown"}</span>
-                {/* <span
-                className={`status-dot ${
-                  c.status === "online" ? "online" : "offline"
-                }`}
-              /> */}
+                <span className="conversation-time">{formatConversationTime(c.updatedAt)}</span>
               </div>
               <div className="conversation-last">
                 {c?.latestMessage?.text || ""}
