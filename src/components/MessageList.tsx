@@ -12,15 +12,14 @@ interface MessageItemProps {
   onDelete?: (messageId: string) => void;
 }
 
-const MessageItem: React.FC<MessageItemProps> = React.memo(({
+const MessageItem = React.memo(function MessageItem({
   message,
   isOwn,
   showAvatar: _showAvatar,
   showTimestamp,
   onUpdate,
   onDelete,
-// eslint-disable-next-line react/display-name
-}) => {
+}: MessageItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
   const [showActions, setShowActions] = useState(false);
@@ -61,18 +60,16 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className={`flex items-start space-x-3 px-4 py-2 group hover:bg-gray-50 ${
-        isOwn ? "flex-row-reverse space-x-reverse" : ""
-      }`}
+      className={`flex items-start space-x-3 px-4 py-2 group hover:bg-gray-50 ${isOwn ? "flex-row-reverse space-x-reverse" : ""
+        }`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       <div className={`flex-1 ${isOwn ? "text-right" : ""}`}>
         {showTimestamp && (
           <div
-            className={`text-xs text-gray-500 mb-1 ${
-              isOwn ? "text-right" : ""
-            }`}
+            className={`text-xs text-gray-500 mb-1 ${isOwn ? "text-right" : ""
+              }`}
           >
             {/* <span className="font-medium">{message.userId}</span> */}
             <span className="ml-2">{formatTime(message.createdAt)}</span>
@@ -80,9 +77,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
         )}
 
         <div
-          className={`inline-block max-w-xs lg:max-w-md px-3 py-2 rounded-lg relative ${
-            isOwn ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-900"
-          }`}
+          className={`inline-block max-w-xs lg:max-w-md px-3 py-2 rounded-lg relative ${isOwn ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-900"
+            }`}
         >
           {isEditing ? (
             <textarea
