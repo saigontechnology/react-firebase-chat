@@ -349,17 +349,10 @@ export class ChatService {
       const conversationDataRef = collection(conversationRef, 'data');
       const typingDocRef = doc(conversationDataRef, 'typing');
 
-      if (isTyping) {
-        await updateDoc(typingDocRef, {
-          [`${userId}`]: true,
-          updatedAt: serverTimestamp(),
-        });
-      } else {
-        await updateDoc(typingDocRef, {
-          [`${userId}`]: false,
-          updatedAt: serverTimestamp(),
-        });
-      }
+      await setDoc(typingDocRef, {
+        [`${userId}`]: isTyping,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
     } catch (error) {
       console.error('Error updating typing status:', error);
     }
