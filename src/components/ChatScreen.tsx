@@ -155,16 +155,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       const partnerIds = conversation.members.filter(
         (m: string) => m !== `${currentUser?.id}`
       );
-      // Use conversation data first (image = partner avatar)
-      setSelectedPartners(
-        partnerIds.map((m: string) => ({
-          id: m,
-          name: conversation.name,
-          avatar: conversation.image,
-        }))
-      );
-      // Fallback: look up user docs if no image stored in conversation
-      if (!conversation.image && partnerIds.length > 0) {
+
+      if (conversation.image) {
+        // Conversation has avatar image — use it directly, no async needed
+        setSelectedPartners(
+          partnerIds.map((m: string) => ({
+            id: m,
+            name: conversation.name,
+            avatar: conversation.image,
+          }))
+        );
+      } else if (partnerIds.length > 0) {
+        // No image — look up user docs (single setState to avoid flicker)
         const userService = UserService.getInstance();
         Promise.all(partnerIds.map((pid) => userService.getUserById(pid))).then(
           (users) => {
@@ -173,6 +175,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
               .map((u) => ({ id: u.id, name: u.name, avatar: u.avatar }));
             if (resolved.length > 0) {
               setSelectedPartners(resolved);
+            } else {
+              // Fallback: use conversation data if user lookup returned nothing
+              setSelectedPartners(
+                partnerIds.map((m: string) => ({
+                  id: m,
+                  name: conversation.name,
+                  avatar: undefined,
+                }))
+              );
             }
           }
         );
