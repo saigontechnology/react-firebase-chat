@@ -137,6 +137,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | undefined
   >(effectiveConversationId);
+  const selectedConversationIdRef = useRef(selectedConversationId);
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
   const [selectedName, setSelectedName] = useState<string>(
     customConversationInfo?.name || ""
   );
@@ -260,9 +264,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           })
         );
         setConversations(decrypted);
-        // If nothing selected, pick first
-        if (!selectedConversationId && decrypted.length > 0) {
+        // If nothing selected, pick first (use ref to avoid stale closure)
+        if (!selectedConversationIdRef.current && decrypted.length > 0) {
           const firstConv = decrypted[0];
+          selectedConversationIdRef.current = firstConv.id;
           setSelectedConversationId(firstConv.id);
           setSelectedName(firstConv.name || "");
           resolvePartners(firstConv);
@@ -280,16 +285,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   }, [selectedConversationId, markAsRead]);
 
   // Resolve partner avatars when conversations load and partners are missing avatar info
+  // Fixed: removed selectedPartners from deps to prevent infinite loop
+  // (resolvePartners -> setSelectedPartners -> re-trigger this effect)
   useEffect(() => {
     const convId = selectedConversationId || effectiveConversationId;
     if (!convId || conversations.length === 0) return;
-    // Skip if partners already have avatar
-    if (selectedPartners.length > 0 && selectedPartners.some((p) => p.avatar)) return;
     const conv = conversations.find((c) => c.id === convId);
     if (conv) {
       resolvePartners(conv);
     }
-  }, [conversations, selectedConversationId, effectiveConversationId, selectedPartners, resolvePartners]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, selectedConversationId, effectiveConversationId]);
 
   const handleSendMessage = useCallback(
     async (text: string) => {

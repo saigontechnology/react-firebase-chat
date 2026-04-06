@@ -134,6 +134,12 @@ const MessageItem = React.memo(function MessageItem({
               isOwn ? "items-end" : "items-start"
             } flex flex-col`}
           >
+            {/* Sender name for received messages */}
+            {!isOwn && isFirstInGroup && (
+              <span className="text-xs text-gray-500 mb-1 ml-1 hm-msg-sender-name">
+                {partnerUser?.name || otherUserId || message.userId}
+              </span>
+            )}
             {/* Message bubble */}
             <div
               className={`px-3 py-2 relative ${
