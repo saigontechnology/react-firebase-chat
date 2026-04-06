@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, isToday, isYesterday, isSameDay } from "date-fns";
-import { Message, MessageListProps } from "../types";
+import { Message, MessageListProps, IUser } from "../types";
+import { UserAvatar } from "./UserAvatar";
 
 interface MessageItemProps {
   message: Message;
@@ -13,8 +14,13 @@ interface MessageItemProps {
   isLastOwnMessage: boolean;
   isSeen: boolean;
   otherUserId?: string;
+  partnerUser?: IUser;
   onUpdate?: (message: Message) => void;
   onDelete?: (messageId: string) => void;
+  messageStatusEnable?: boolean;
+  customMessageStatus?: (hasUnread: boolean) => React.ReactNode;
+  unReadSentMessage?: string;
+  unReadSeenMessage?: string;
 }
 
 const DateSeparator: React.FC<{ date: number }> = ({ date }) => {
@@ -43,8 +49,13 @@ const MessageItem = React.memo(function MessageItem({
   isLastOwnMessage,
   isSeen,
   otherUserId,
+  partnerUser,
   onUpdate,
   onDelete,
+  messageStatusEnable = true,
+  customMessageStatus,
+  unReadSentMessage = "Sent",
+  unReadSeenMessage = "Seen",
 }: MessageItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
@@ -103,17 +114,17 @@ const MessageItem = React.memo(function MessageItem({
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
         >
-          {/* Avatar placeholder for other users */}
+          {/* Avatar for other users — uses partner info if available */}
           {!isOwn && (
             <div className="w-8 h-8 mr-1.5 flex-shrink-0 self-end">
               {showAvatar && (
-                <div className="w-8 h-8 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center">
-                  {message.userId ? (
-                    <span className="text-white text-xs font-bold uppercase">
-                      {(otherUserId || message.userId).charAt(0)}
-                    </span>
-                  ) : null}
-                </div>
+                <UserAvatar
+                  user={partnerUser || {
+                    id: otherUserId || message.userId,
+                    name: otherUserId || message.userId,
+                  }}
+                  size="small"
+                />
               )}
             </div>
           )}
@@ -123,6 +134,12 @@ const MessageItem = React.memo(function MessageItem({
               isOwn ? "items-end" : "items-start"
             } flex flex-col`}
           >
+            {/* Sender name for received messages */}
+            {!isOwn && isFirstInGroup && partnerUser?.name && (
+              <span className="text-xs text-gray-500 mb-1 ml-1 hm-msg-sender-name">
+                {partnerUser.name}
+              </span>
+            )}
             {/* Message bubble */}
             <div
               className={`px-3 py-2 relative ${
@@ -183,12 +200,16 @@ const MessageItem = React.memo(function MessageItem({
               </div>
             </div>
 
-            {/* Seen indicator below last own message */}
-            {isLastOwnMessage && isSeen && (
+            {/* Message status indicator (matching rn-firebase-chat) */}
+            {messageStatusEnable && isLastOwnMessage && (
               <div className="mt-1 mr-1 self-end">
-                <span className="bg-gray-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                  Seen
-                </span>
+                {customMessageStatus ? (
+                  customMessageStatus(!isSeen)
+                ) : (
+                  <span className="bg-gray-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                    {isSeen ? unReadSeenMessage : unReadSentMessage}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -246,12 +267,17 @@ const MessageItem = React.memo(function MessageItem({
   }
 );
 
-export const MessageList: React.FC<MessageListProps> = ({
+export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }> = ({
   messages,
   currentUser,
+  partnerUsers,
   onMessageUpdate,
   onMessageDelete,
   className = "",
+  messageStatusEnable = true,
+  customMessageStatus,
+  unReadSentMessage,
+  unReadSeenMessage,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -348,8 +374,13 @@ export const MessageList: React.FC<MessageListProps> = ({
                 isLastOwnMessage={isLastOwnMessage}
                 isSeen={isLastOwnMessageSeen}
                 otherUserId={message.userId}
+                partnerUser={partnerUsers?.find((p) => p.id === message.userId) || partnerUsers?.[0]}
                 onUpdate={onMessageUpdate}
                 onDelete={onMessageDelete}
+                messageStatusEnable={messageStatusEnable}
+                customMessageStatus={customMessageStatus}
+                unReadSentMessage={unReadSentMessage}
+                unReadSeenMessage={unReadSeenMessage}
               />
             </motion.div>
           );

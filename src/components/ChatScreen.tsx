@@ -5,8 +5,16 @@ import { TypingIndicator } from "./TypingIndicator";
 import { useChatContext } from "../context/ChatProvider";
 import { FileUploader } from "../addons/fileUpload/FileUploader";
 import { useChat } from "../hooks/useChat";
-import { Message, IUser, ConversationProps } from "../types";
+import { useTyping } from "../hooks/useTyping";
+import {
+  Message,
+  IUser,
+  ConversationProps,
+  InputToolbarProps,
+  CustomConversationInfo,
+} from "../types";
 import { ChatService } from "../services/chat";
+import { UserService } from "../services/user";
 import { ButtonMaterialIcon } from "./ButtonMaterialIcon";
 import "./ChatScreen.css";
 import { ChatHeader } from "./ChatHeader";
@@ -14,6 +22,10 @@ import { generateConversationId } from "../utils/conversation";
 import { decryptedMessageData } from "../utils/encryption";
 import ChatList, { ChatListProps } from "./ChatList";
 import { ChatNewModal, ChatNewModalRef } from "./ChatNewModal";
+import {
+  DEFAULT_TYPING_TIMEOUT_SECONDS,
+  DEFAULT_CLEAR_SEND_NOTIFICATION,
+} from "../utils/constants";
 
 export interface ChatScreenProps {
   conversationId?: string;
@@ -28,6 +40,41 @@ export interface ChatScreenProps {
   renderChatNewModal?: (props: {
     onUserSelect: (user: { id: string; name: string; avatar?: string }) => void;
   }) => React.ReactNode;
+
+  // --- RN-compatible props ---
+
+  /** Custom input toolbar configuration (matching rn-firebase-chat) */
+  inputToolbarProps?: InputToolbarProps;
+  /** Override conversation id/name/image (matching rn-firebase-chat) */
+  customConversationInfo?: CustomConversationInfo;
+  /** Message pagination size (default: 50, matching rn-firebase-chat maxPageSize) */
+  maxPageSize?: number;
+  /** Toggle read receipt display (default: true) */
+  messageStatusEnable?: boolean;
+  /** Custom JSX for sent/seen indicators */
+  customMessageStatus?: (hasUnread: boolean) => React.ReactNode;
+  /** Custom text for "Sent" status */
+  unReadSentMessage?: string;
+  /** Custom text for "Seen" status */
+  unReadSeenMessage?: string;
+  /** Enable typing indicator (default: true) */
+  enableTyping?: boolean;
+  /** Typing indicator timeout in ms (default: 3000) */
+  typingTimeoutSeconds?: number;
+  /** Callback when messages start loading */
+  onStartLoad?: () => void;
+  /** Callback when messages finish loading */
+  onLoadEnd?: () => void;
+  /** Callback to trigger push notifications after send */
+  sendMessageNotification?: () => void;
+  /** Delay before sending notification in ms (default: 3000) */
+  timeoutSendNotify?: number;
+  /** Enable search bar in conversation list */
+  hasSearchBar?: boolean;
+  /** Search bar placeholder */
+  searchPlaceholder?: string;
+  /** Search debounce delay in ms */
+  searchDebounceDelay?: number;
 }
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({
@@ -41,8 +88,25 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   renderHeader,
   renderChatList,
   renderChatNewModal,
+  inputToolbarProps,
+  customConversationInfo,
+  maxPageSize = 50,
+  messageStatusEnable = true,
+  customMessageStatus,
+  unReadSentMessage,
+  unReadSeenMessage,
+  enableTyping = true,
+  typingTimeoutSeconds = DEFAULT_TYPING_TIMEOUT_SECONDS,
+  onStartLoad,
+  onLoadEnd,
+  sendMessageNotification,
+  timeoutSendNotify = DEFAULT_CLEAR_SEND_NOTIFICATION,
+  hasSearchBar = false,
+  searchPlaceholder,
+  searchDebounceDelay,
 }) => {
-  const { currentUser, derivedKey } = useChatContext();
+  const { currentUser, derivedKey, enableEncrypt, blackListRegex, prefix, storageProvider } =
+    useChatContext();
   const [showUploader, setShowUploader] = useState(false);
 
   const chatNewModalRef = useRef<ChatNewModalRef>(null);
@@ -53,18 +117,80 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     derivedKeyRef.current = derivedKey;
   }, [derivedKey]);
 
+  // Configure ChatService with prefix, blacklist, and storageProvider
+  useEffect(() => {
+    const chatService = ChatService.getInstance();
+    chatService.setPrefix(prefix);
+    chatService.setBlackListRegex(blackListRegex);
+    if (storageProvider) {
+      chatService.setStorageProvider(storageProvider);
+    }
+  }, [prefix, blackListRegex, storageProvider]);
+
+  // Resolve effective conversationId from customConversationInfo
+  const effectiveConversationId = customConversationInfo?.id || conversationId;
+
   // Conversations list from users/{userId}/conversations
   const [conversations, setConversations] = useState<Array<ConversationProps>>([]);
   const rawConversationsRef = useRef<ConversationProps[]>([]);
 
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | undefined
-  >(conversationId);
-  const [selectedName, setSelectedName] = useState<string>("");
+  >(effectiveConversationId);
+  const selectedConversationIdRef = useRef(selectedConversationId);
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+  const [selectedName, setSelectedName] = useState<string>(
+    customConversationInfo?.name || ""
+  );
 
   // Selected partners in the selected conversation
   const [selectedPartners, setSelectedPartners] =
     useState<Array<IUser>>(partners);
+
+  // Resolve partner info (name + avatar) from a conversation object
+  const resolvePartners = useCallback(
+    (conversation: ConversationProps) => {
+      const partnerIds = conversation.members.filter(
+        (m: string) => m !== `${currentUser?.id}`
+      );
+
+      if (conversation.image) {
+        // Conversation has avatar image — use it directly, no async needed
+        setSelectedPartners(
+          partnerIds.map((m: string) => ({
+            id: m,
+            name: conversation.name,
+            avatar: conversation.image,
+          }))
+        );
+      } else if (partnerIds.length > 0) {
+        // No image — look up user docs (single setState to avoid flicker)
+        const userService = UserService.getInstance();
+        Promise.all(partnerIds.map((pid) => userService.getUserById(pid))).then(
+          (users) => {
+            const resolved = users
+              .filter((u): u is NonNullable<typeof u> => u !== null)
+              .map((u) => ({ id: u.id, name: u.name, avatar: u.avatar }));
+            if (resolved.length > 0) {
+              setSelectedPartners(resolved);
+            } else {
+              // Fallback: use conversation data if user lookup returned nothing
+              setSelectedPartners(
+                partnerIds.map((m: string) => ({
+                  id: m,
+                  name: conversation.name,
+                  avatar: undefined,
+                }))
+              );
+            }
+          }
+        );
+      }
+    },
+    [currentUser?.id]
+  );
 
   const memberIds = useMemo(
     () => [...new Set([`${currentUser.id}`, ...selectedPartners.map((p) => p.id)])],
@@ -81,10 +207,26 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const { messages, loading, error, sendMessage, markAsRead } = useChat({
     user: currentUser,
-    conversationId: selectedConversationId || conversationId,
+    conversationId: selectedConversationId || effectiveConversationId,
     memberIds,
     name: chatName,
   });
+
+  // Typing hook with configurable timeout
+  const { typingUsers, setTyping } = useTyping(
+    selectedConversationId || effectiveConversationId || "",
+    `${currentUser.id}`,
+    typingTimeoutSeconds
+  );
+
+  // Lifecycle callbacks
+  useEffect(() => {
+    if (loading) {
+      onStartLoad?.();
+    } else {
+      onLoadEnd?.();
+    }
+  }, [loading, onStartLoad, onLoadEnd]);
 
   const convertedUser = useMemo<IUser>(
     () =>
@@ -133,10 +275,13 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           })
         );
         setConversations(decrypted);
-        // If nothing selected, pick first
-        if (!selectedConversationId && decrypted.length > 0) {
-          setSelectedConversationId(decrypted[0].id);
-          setSelectedName(decrypted[0].name || "");
+        // If nothing selected, pick first (use ref to avoid stale closure)
+        if (!selectedConversationIdRef.current && decrypted.length > 0) {
+          const firstConv = decrypted[0];
+          selectedConversationIdRef.current = firstConv.id;
+          setSelectedConversationId(firstConv.id);
+          setSelectedName(firstConv.name || "");
+          resolvePartners(firstConv);
         }
       }
     );
@@ -150,15 +295,35 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }
   }, [selectedConversationId, markAsRead]);
 
+  // Resolve partner avatars when conversations load and partners are missing avatar info
+  // Fixed: removed selectedPartners from deps to prevent infinite loop
+  // (resolvePartners -> setSelectedPartners -> re-trigger this effect)
+  useEffect(() => {
+    const convId = selectedConversationId || effectiveConversationId;
+    if (!convId || conversations.length === 0) return;
+    const conv = conversations.find((c) => c.id === convId);
+    if (conv) {
+      resolvePartners(conv);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, selectedConversationId, effectiveConversationId]);
+
   const handleSendMessage = useCallback(
     async (text: string) => {
       try {
         await sendMessage(text);
+
+        // Notification callback with configurable delay
+        if (sendMessageNotification) {
+          setTimeout(() => {
+            sendMessageNotification();
+          }, timeoutSendNotify);
+        }
       } catch (error) {
         console.error("Failed to send message:", error);
       }
     },
-    [sendMessage]
+    [sendMessage, sendMessageNotification, timeoutSendNotify]
   );
 
   const handleSendTextMessage = useCallback(
@@ -170,17 +335,30 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     [handleSendMessage, markAsRead]
   );
 
+  const handleTyping = useCallback(
+    (isTyping: boolean) => {
+      if (enableTyping) {
+        setTyping(isTyping);
+      }
+    },
+    [enableTyping, setTyping]
+  );
+
   const startChatWithUser = useCallback(
     async (targetUser: IUser) => {
       try {
         const chatService = ChatService.getInstance();
+        const memberAvatars: Record<string, string> = {};
+        if (currentUser.avatar) memberAvatars[`${currentUser.id}`] = currentUser.avatar;
+        if (targetUser.avatar) memberAvatars[targetUser.id] = targetUser.avatar;
         const newId = await chatService.createConversation(
           [`${currentUser.id}`, targetUser.id],
           `${currentUser.id}`,
           "private",
           currentUser.name,
           targetUser.name,
-          generateConversationId([`${currentUser.id}`, targetUser.id])
+          generateConversationId([`${currentUser.id}`, targetUser.id]),
+          memberAvatars,
         );
         chatNewModalRef.current?.hide();
         setSelectedConversationId(newId);
@@ -195,11 +373,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const handleFileUpload = useCallback(
     async (files: File[]) => {
-      // Handle file uploads
       console.log("Files uploaded:", files);
       setShowUploader(false);
 
-      // For each file, send a text message indicating file was uploaded
       for (const file of files) {
         const text = `File uploaded: ${file.name}`;
         await handleSendMessage(text);
@@ -212,16 +388,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     (conversation: ConversationProps) => {
       setSelectedConversationId(conversation.id);
       setSelectedName(conversation.name || "");
-      setSelectedPartners(
-        conversation.members
-          .filter((m: string) => m !== currentUser?.id)
-          .map((m: string) => ({ id: m }))
-      );
+      resolvePartners(conversation);
     },
-    [currentUser?.id]
+    [resolvePartners]
   );
-
-  // Do not block the whole screen while loading a conversation
 
   if (error) {
     return (
@@ -233,6 +403,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       </div>
     );
   }
+
+  // Determine whether to show camera/gallery buttons from inputToolbarProps
+  const showCamera = inputToolbarProps?.hasCamera ?? false;
+  const showGallery = inputToolbarProps?.hasGallery ?? false;
+  const showFileUploadBtn = showFileUpload && !inputToolbarProps;
 
   return (
     <div className={`chat-screen ${className}`} style={style}>
@@ -248,6 +423,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             conversations,
             selectedConversationId: selectedConversationId || "",
             handleSelectConversation,
+            hasSearchBar,
+            searchPlaceholder,
+            searchDebounceDelay,
           })
         ) : (
           <ChatList
@@ -255,6 +433,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             conversations={conversations}
             selectedConversationId={selectedConversationId || ""}
             handleSelectConversation={handleSelectConversation}
+            hasSearchBar={hasSearchBar}
+            searchPlaceholder={searchPlaceholder}
+            searchDebounceDelay={searchDebounceDelay}
           />
         )}
 
@@ -263,7 +444,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           <div className="chat-panel-header">
             <div className="chat-target">
               <span className="target-name">
-                {selectedName || selectedPartners[0]?.name || "..."}
+                {customConversationInfo?.name ||
+                  selectedName ||
+                  selectedPartners[0]?.name ||
+                  "..."}
               </span>
             </div>
             <div className="chat-actions">
@@ -290,21 +474,48 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                 <MessageList
                   messages={messages}
                   currentUser={convertedUser}
+                  partnerUsers={selectedPartners}
                   onMessageUpdate={(message) =>
                     console.log("Message updated:", message)
                   }
                   onMessageDelete={(messageId) =>
                     console.log("Delete message:", messageId)
                   }
+                  messageStatusEnable={messageStatusEnable}
+                  customMessageStatus={customMessageStatus}
+                  unReadSentMessage={unReadSentMessage}
+                  unReadSeenMessage={unReadSeenMessage}
                 />
-                <TypingIndicator typingUsers={[]} />
+                {enableTyping && <TypingIndicator typingUsers={typingUsers} />}
               </>
             )}
           </div>
 
           <div className="panel-input">
-            <div className="input-box">
-              {showFileUpload && (
+            <div
+              className="input-box"
+              style={inputToolbarProps?.containerStyle}
+            >
+              {/* Camera button from inputToolbarProps */}
+              {showCamera && (
+                <ButtonMaterialIcon
+                  className="attach-btn"
+                  title="Camera"
+                  icon={inputToolbarProps?.cameraIcon || "photo_camera"}
+                  onClick={inputToolbarProps?.onPressCamera}
+                />
+              )}
+              {/* Gallery button from inputToolbarProps */}
+              {showGallery && (
+                <ButtonMaterialIcon
+                  className="attach-btn"
+                  title="Gallery"
+                  icon={inputToolbarProps?.galleryIcon || "photo_library"}
+                  onClick={inputToolbarProps?.onPressGallery}
+                />
+              )}
+              {/* Default file upload button */}
+              {showFileUploadBtn && (
                 <ButtonMaterialIcon
                   className="attach-btn"
                   title="Attach file"
@@ -315,7 +526,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
               <div className="input-flex">
                 <MessageInput
                   onSendMessage={handleSendTextMessage}
-                  onTyping={(isTyping) => console.log("Typing:", isTyping)}
+                  onTyping={handleTyping}
                   placeholder="Type your message..."
                   className="message-input-reset"
                 />

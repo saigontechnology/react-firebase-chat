@@ -22,6 +22,8 @@ export { useChat } from './hooks/useChat';
 export type { UseChatProps } from './hooks/useChat';
 export * from './hooks/useMessages';
 export * from './hooks/useTyping';
+export { useDebounce } from './hooks/useDebounce';
+export { useChatSelector } from './hooks/useChatSelector';
 
 // Context providers
 export * from './context/ChatProvider';
@@ -74,6 +76,18 @@ export type {
 export * from './utils/formatters';
 export * from './utils/validation';
 export * from './utils/encryption';
+export * from './utils/constants';
+export * from './utils/color';
+export {
+  sanitizeUserInput,
+  validateFilePath,
+  validateEncryptionKey,
+  validateMessageContent,
+  validateUserIdStrict,
+  generateBadWordsRegex,
+  filterBlackListWords,
+  RateLimiter,
+} from './utils/security';
 
 // Styles
 import './styles.css';

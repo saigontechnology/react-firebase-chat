@@ -129,7 +129,7 @@ export interface MediaFile {
   type: MediaType;
 }
 
-// Encryption options used by the library
+// Encryption options used by the library (matching rn-firebase-chat)
 export interface EncryptionOptions {
   salt: string;
   iterations?: number;
@@ -148,6 +148,35 @@ export interface EncryptionStatus {
   keyGenerated: boolean;
   testPassed?: boolean;
   lastTestedAt?: number; // timestamp in milliseconds
+}
+
+// Storage provider interface (matching rn-firebase-chat)
+export interface UploadResult {
+  downloadUrl: string;
+  fullPath: string;
+}
+
+export interface StorageFile {
+  name: string;
+  downloadUrl: string;
+}
+
+export interface StorageProvider {
+  uploadFile(localPath: string, remotePath: string): Promise<UploadResult>;
+  getDownloadUrl(remotePath: string): Promise<string>;
+  listFiles(directoryPath: string): Promise<StorageFile[]>;
+}
+
+// Input toolbar props (matching rn-firebase-chat)
+export interface InputToolbarProps {
+  hasCamera?: boolean;
+  hasGallery?: boolean;
+  onPressCamera?: () => void;
+  onPressGallery?: () => void;
+  containerStyle?: React.CSSProperties;
+  cameraIcon?: string;
+  galleryIcon?: string;
+  iconSend?: string;
 }
 
 // User profile document stored in /users
@@ -295,6 +324,10 @@ export interface MessageListProps {
   onMessageUpdate?: (message: Message) => void;
   onMessageDelete?: (messageId: string) => void;
   className?: string;
+  messageStatusEnable?: boolean;
+  customMessageStatus?: (hasUnread: boolean) => React.ReactNode;
+  unReadSentMessage?: string;
+  unReadSeenMessage?: string;
 }
 
 export interface MessageInputProps {
@@ -303,6 +336,7 @@ export interface MessageInputProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  maxInputLength?: number;
 }
 
 export interface UserAvatarProps {

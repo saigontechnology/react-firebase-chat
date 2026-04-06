@@ -29,7 +29,7 @@ const convertMessages = async (rawMessages: IMessage[], key: string | null): Pro
 
 export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps): UseChatReturn => {
   const chatService = ChatService.getInstance();
-  const { derivedKey } = useChatContext();
+  const { derivedKey, enableEncrypt, encryptionFuncProps } = useChatContext();
 
   // Keep a ref so callbacks always read the latest key without being in deps
   const derivedKeyRef = useRef(derivedKey);
@@ -44,11 +44,14 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Determine the effective key: null when encryption is disabled
+  const effectiveKey = enableEncrypt ? derivedKey : null;
+
   // Re-decrypt cached messages when derivedKey first resolves
   useEffect(() => {
-    if (!derivedKey || rawMessagesRef.current.length === 0) return;
-    convertMessages(rawMessagesRef.current, derivedKey).then(setMessages);
-  }, [derivedKey]);
+    if (!effectiveKey || rawMessagesRef.current.length === 0) return;
+    convertMessages(rawMessagesRef.current, effectiveKey).then(setMessages);
+  }, [effectiveKey]);
 
   // Stable subscription — never torn down unless conversationId changes
   useEffect(() => {
@@ -62,7 +65,8 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
 
     const unsubscribe = chatService.subscribeToMessages(conversationId, async (newMessages) => {
       rawMessagesRef.current = newMessages;
-      const converted = await convertMessages(newMessages, derivedKeyRef.current);
+      const key = enableEncrypt ? derivedKeyRef.current : null;
+      const converted = await convertMessages(newMessages, key);
       setMessages(converted);
       setLoading(false);
     });
@@ -70,7 +74,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
     return () => {
       unsubscribe?.();
     };
-  }, [conversationId, chatService]);
+  }, [conversationId, chatService, enableEncrypt]);
 
   // Send a text message
   const sendMessage = useCallback(async (text: string) => {
@@ -79,9 +83,16 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
         throw new Error('No conversation selected');
       }
 
-      const encryptedText = derivedKeyRef.current
-        ? await encryptData(text, derivedKeyRef.current)
-        : text;
+      let encryptedText = text;
+
+      if (enableEncrypt) {
+        // Use custom encrypt function if provided (matching rn-firebase-chat)
+        if (encryptionFuncProps?.encryptFunctionProp) {
+          encryptedText = await encryptionFuncProps.encryptFunctionProp(text);
+        } else if (derivedKeyRef.current) {
+          encryptedText = await encryptData(text, derivedKeyRef.current);
+        }
+      }
 
       const messageData = {
         text: encryptedText,
@@ -103,7 +114,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
       setError(err instanceof Error ? err.message : 'Failed to send message');
       throw err;
     }
-  }, [conversationId, user?.id, user?.name, chatService, memberIds, name]);
+  }, [conversationId, user?.id, user?.name, chatService, memberIds, name, enableEncrypt, encryptionFuncProps]);
 
   // Delete a message
   const deleteMessage = useCallback(async (messageId: string) => {

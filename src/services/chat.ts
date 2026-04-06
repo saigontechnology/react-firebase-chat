@@ -24,15 +24,10 @@ import {
   FireStoreCollection,
   IMessage,
   MediaType,
+  StorageProvider,
 } from '../types';
 import { convertToLatestMessage } from '../utils/formatters';
-
-// Collections as per documentation
-export const COLLECTIONS = {
-  CONVERSATIONS: 'conversations',
-  MESSAGES: 'messages',
-  USERS: 'users'
-} as const;
+import { filterBlackListWords } from '../utils/security';
 
 /**
  * Chat service compatible with RN-Firebase-Chat implementation
@@ -43,6 +38,18 @@ export class ChatService {
   private db;
   private storage;
   private userService: UserService;
+
+  /** Collection prefix for multi-environment support (matching rn-firebase-chat) */
+  private prefix: string = '';
+
+  /** Decryption cache: ciphertext -> plaintext (matching rn-firebase-chat) */
+  private decryptCache = new Map<string, string>();
+
+  /** Blacklist regex for word filtering */
+  private blackListRegex?: RegExp;
+
+  /** Custom storage provider */
+  private storageProvider?: StorageProvider;
 
   constructor() {
     this.db = getFirebaseFirestore();
@@ -57,6 +64,52 @@ export class ChatService {
     return ChatService.instance;
   }
 
+  /** Configure collection prefix (matching rn-firebase-chat) */
+  setPrefix(prefix: string): void {
+    this.prefix = prefix;
+  }
+
+  /** Get prefixed collection name */
+  private getCollectionName(name: string): string {
+    return this.prefix ? `${this.prefix}-${name}` : name;
+  }
+
+  /** Set custom storage provider (matching rn-firebase-chat) */
+  setStorageProvider(provider: StorageProvider): void {
+    this.storageProvider = provider;
+  }
+
+  /** Set blacklist regex for content filtering */
+  setBlackListRegex(regex?: RegExp): void {
+    this.blackListRegex = regex;
+  }
+
+  /** Cached decrypt — avoids re-decrypting the same ciphertext (matching rn-firebase-chat) */
+  getCachedDecrypt(cipher: string): string | undefined {
+    return this.decryptCache.get(cipher);
+  }
+
+  setCachedDecrypt(cipher: string, plain: string): void {
+    this.decryptCache.set(cipher, plain);
+  }
+
+  clearDecryptCache(): void {
+    this.decryptCache.clear();
+  }
+
+  // Collections getter with prefix support
+  private get CONVERSATIONS() {
+    return this.getCollectionName(FireStoreCollection.conversations);
+  }
+
+  private get MESSAGES() {
+    return this.getCollectionName(FireStoreCollection.messages);
+  }
+
+  private get USERS() {
+    return this.getCollectionName(FireStoreCollection.users);
+  }
+
   // Create conversation (same logic as RN app) - as per documentation
   async createConversation(
     memberIds: string[],
@@ -65,6 +118,7 @@ export class ChatService {
     name?: string,
     otherName?: string,
     conversationId?: string,
+    memberAvatars?: Record<string, string>,
   ): Promise<string> {
     try {
       const conversationData = {
@@ -81,22 +135,19 @@ export class ChatService {
       let docRefId: string;
 
       if (conversationId) {
-        // Create the document with the specified conversationId
         await updateDoc(
-          doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
+          doc(this.db, this.CONVERSATIONS, conversationId),
           conversationData
         ).catch(async (_err) => {
-          // If doc does not exist, set it
           await setDoc(
-            doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
+            doc(this.db, this.CONVERSATIONS, conversationId),
             conversationData
           );
         });
         docRefId = conversationId;
       } else {
-        // Add a new document with auto-generated ID
         const docRef = await addDoc(
-          collection(this.db, COLLECTIONS.CONVERSATIONS),
+          collection(this.db, this.CONVERSATIONS),
           conversationData
         );
         docRefId = docRef.id;
@@ -104,20 +155,21 @@ export class ChatService {
 
       // Create user conversation references for each member
       const promises = memberIds.map(async (memberId) => {
-        // Ensure user document exists
         await this.userService.createUserIfNotExists(memberId);
 
-        // Get the chat name based on the memberId and initiatorId
         const chatName = memberId === initiatorId ? otherName : name;
-        // Add conversation reference to user's conversations subcollection
+        // Store the partner's avatar as the conversation image for this member
+        const partnerId = memberIds.find(id => id !== memberId);
+        const partnerAvatar = partnerId && memberAvatars?.[partnerId];
         await setDoc(
-          doc(this.db, COLLECTIONS.USERS, memberId, COLLECTIONS.CONVERSATIONS, docRefId),
+          doc(this.db, this.USERS, memberId, 'conversations', docRefId),
           {
             joinedAt: serverTimestamp(),
             unRead: 0,
             updatedAt: serverTimestamp(),
             members: memberIds,
             name: chatName || '',
+            ...(partnerAvatar ? { image: partnerAvatar } : {}),
           }
         );
       });
@@ -130,15 +182,10 @@ export class ChatService {
     }
   }
 
-  /**
-   * Check if a conversation exists in Firestore
-   * @param conversationId - The ID of the conversation to check
-   * @returns Promise<boolean> - True if conversation exists, false otherwise
-   */
   private async conversationExists(conversationId: string): Promise<boolean> {
     try {
       const conversationDoc = await getDoc(
-        doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId)
+        doc(this.db, this.CONVERSATIONS, conversationId)
       );
       return conversationDoc.exists();
     } catch (error) {
@@ -147,13 +194,6 @@ export class ChatService {
     }
   }
 
-  /**
-   * Send a message to a conversation. Creates the conversation if it doesn't exist.
-   * @param conversationId - The ID of the conversation
-   * @param message - The message to send (without id and createdAt)
-   * @param conversationOptions - Optional parameters for conversation creation if it doesn't exist
-   * @returns Promise<void>
-   */
   async sendMessage(
     conversationId: string,
     message: Omit<IMessage, 'id' | 'createdAt' | 'user'>,
@@ -165,16 +205,13 @@ export class ChatService {
     }
   ): Promise<void> {
     try {
-      // Check if conversation exists, create if it doesn't
       const conversationExists = await this.conversationExists(conversationId);
       const memberIds = conversationOptions?.memberIds || [String(message.senderId)];
 
       if (!conversationExists) {
-        // Use provided options or defaults
         const initiatorId = String(message.senderId);
         const type = conversationOptions?.type || 'private';
 
-        // Create the conversation
         await this.createConversation(
           memberIds,
           initiatorId,
@@ -185,20 +222,24 @@ export class ChatService {
         );
       }
 
+      // Apply blacklist filtering to message text
+      const filteredText = this.blackListRegex
+        ? filterBlackListWords(message.text || '', this.blackListRegex)
+        : message.text;
+
       const messageData = {
         ...message,
+        text: filteredText,
         createdAt: serverTimestamp(),
       };
 
-      // Add message to conversation
       const messageRef = await addDoc(
-        collection(this.db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES),
+        collection(this.db, this.CONVERSATIONS, conversationId, 'messages'),
         messageData
       );
 
-      // Update conversation with last message
       await updateDoc(
-        doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId),
+        doc(this.db, this.CONVERSATIONS, conversationId),
         {
           latestMessage: { ...messageData, id: messageRef.id },
           latestMessageTime: serverTimestamp(),
@@ -206,26 +247,22 @@ export class ChatService {
         }
       );
 
-      // Update unread counts for other members
       const conversationDoc = await getDoc(
-        doc(this.db, COLLECTIONS.CONVERSATIONS, conversationId)
+        doc(this.db, this.CONVERSATIONS, conversationId)
       );
 
       if (conversationDoc.exists()) {
-        // Use members from the conversation document so all participants are updated,
-        // regardless of what memberIds was passed by the caller
         const allMembers: string[] = conversationDoc.data()?.members || memberIds;
         const updatePromises = allMembers.map(async (memberId: string) => {
           const isSender = memberId === message.senderId;
-          // Update unread count in user's conversations subcollection
           await setDoc(
-            doc(this.db, COLLECTIONS.USERS, memberId, COLLECTIONS.CONVERSATIONS, conversationId),
+            doc(this.db, this.USERS, memberId, 'conversations', conversationId),
             {
               unRead: increment(isSender ? 0 : 1),
               updatedAt: serverTimestamp(),
-              latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', message.text || ''),
+              latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', filteredText || ''),
             },
-            { merge: true } // Merge with existing data if document exists
+            { merge: true }
           );
         });
 
@@ -244,7 +281,7 @@ export class ChatService {
     limitCount: number = 50
   ): () => void {
     const messagesQuery = query(
-      collection(this.db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES),
+      collection(this.db, this.CONVERSATIONS, conversationId, 'messages'),
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
@@ -272,27 +309,19 @@ export class ChatService {
         } as IMessage);
       });
 
-      // Get the last document for pagination
       const lastDoc = snapshot.docs[snapshot.docs.length - 1];
       callback(messages.reverse(), lastDoc);
     });
   }
 
-  /**
-   * Get user's conversations from the user's conversations subcollection
-   * @param userId - The ID of the user
-   * @param callback - Callback function to receive conversations
-   * @returns Unsubscribe function
-   */
   subscribeToUserConversations(
     userId: string,
     callback: (userConversations: any[]) => void
   ): () => void {
-    // First ensure user document exists
     this.userService.createUserIfNotExists(userId).catch(console.error);
 
     const userConversationsQuery = query(
-      collection(this.db, COLLECTIONS.USERS, userId, 'conversations'),
+      collection(this.db, this.USERS, userId, 'conversations'),
       orderBy('updatedAt', 'desc')
     );
 
@@ -316,24 +345,16 @@ export class ChatService {
   // Update typing status
   async updateTypingStatus(conversationId: string, userId: string, isTyping: boolean): Promise<void> {
     try {
-      const conversationRef = doc(this.db, FireStoreCollection.conversations, conversationId);
+      const conversationRef = doc(this.db, this.CONVERSATIONS, conversationId);
       const conversationDataRef = collection(conversationRef, 'data');
       const typingDocRef = doc(conversationDataRef, 'typing');
 
-      if (isTyping) {
-        await updateDoc(typingDocRef, {
-          [`${userId}`]: true,
-          updatedAt: serverTimestamp(),
-        });
-      } else {
-        await updateDoc(typingDocRef, {
-          [`${userId}`]: false,
-          updatedAt: serverTimestamp(),
-        });
-      }
+      await setDoc(typingDocRef, {
+        [`${userId}`]: isTyping,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
     } catch (error) {
       console.error('Error updating typing status:', error);
-      // Don't throw error for typing status as it's not critical
     }
   }
 
@@ -342,7 +363,7 @@ export class ChatService {
     conversationId: string,
     callback: (typingUsers: Record<string, boolean>) => void
   ): Unsubscribe {
-    const conversationRef = doc(this.db, FireStoreCollection.conversations, conversationId);
+    const conversationRef = doc(this.db, this.CONVERSATIONS, conversationId);
     const typingDocRef = doc(conversationRef, 'data', 'typing');
 
     return onSnapshot(typingDocRef, (snapshot) => {
@@ -364,7 +385,7 @@ export class ChatService {
   // Update unread count
   async updateUnread(conversationId: string, userId: string): Promise<void> {
     try {
-      const conversationRef = doc(this.db, FireStoreCollection.users, userId, FireStoreCollection.conversations, conversationId);
+      const conversationRef = doc(this.db, this.USERS, userId, 'conversations', conversationId);
       await setDoc(conversationRef, { unRead: 0 }, { merge: true });
     } catch (error) {
       console.error('Error updating unread count:', error);
@@ -372,13 +393,21 @@ export class ChatService {
     }
   }
 
-  // Upload file for message
+  // Upload file for message — uses storageProvider if set, otherwise Firebase Storage
   async uploadFile(file: File, conversationId: string): Promise<{ path: string; downloadURL: string }> {
     try {
       const fileName = `${Date.now()}_${file.name}`;
       const filePath = `conversations/${conversationId}/files/${fileName}`;
-      const fileRef = ref(this.storage, filePath);
 
+      if (this.storageProvider) {
+        // Use Blob URL as local path for web
+        const localPath = URL.createObjectURL(file);
+        const result = await this.storageProvider.uploadFile(localPath, filePath);
+        URL.revokeObjectURL(localPath);
+        return { path: result.fullPath, downloadURL: result.downloadUrl };
+      }
+
+      const fileRef = ref(this.storage, filePath);
       const snapshot = await uploadBytes(fileRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
 
@@ -395,7 +424,7 @@ export class ChatService {
   // Delete message
   async deleteMessage(conversationId: string, messageId: string): Promise<void> {
     try {
-      const messageRef = doc(this.db, FireStoreCollection.conversations, conversationId, FireStoreCollection.messages, messageId);
+      const messageRef = doc(this.db, this.CONVERSATIONS, conversationId, 'messages', messageId);
       await deleteDoc(messageRef);
     } catch (error) {
       console.error('Error deleting message:', error);
@@ -403,7 +432,7 @@ export class ChatService {
     }
   }
 
-  // Get messages with pagination support - for loadMore functionality
+  // Get messages with pagination support
   async getMessagesWithPagination(
     conversationId: string,
     limitCount: number = 50,
@@ -411,15 +440,14 @@ export class ChatService {
   ): Promise<IMessage[]> {
     try {
       let messagesQuery = query(
-        collection(this.db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES),
+        collection(this.db, this.CONVERSATIONS, conversationId, 'messages'),
         orderBy('createdAt', 'desc'),
         limit(limitCount)
       );
 
-      // Add pagination if we have a starting point
       if (latestMessageDoc) {
         messagesQuery = query(
-          collection(this.db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES),
+          collection(this.db, this.CONVERSATIONS, conversationId, 'messages'),
           orderBy('createdAt', 'desc'),
           startAfter(latestMessageDoc),
           limit(limitCount)

@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { UserAvatar } from "./UserAvatar";
 import { ConversationProps } from "../types";
 import { useChatContext } from "../context/ChatProvider";
+import { useDebounce } from "../hooks/useDebounce";
 import "./ChatScreen.css";
 
 const formatConversationTime = (ts?: number): string => {
@@ -18,6 +19,12 @@ export interface ChatListProps {
   conversations: ConversationProps[];
   selectedConversationId: string;
   handleSelectConversation: (conversation: ConversationProps) => void;
+  /** Enable search bar (matching rn-firebase-chat ListConversationScreen) */
+  hasSearchBar?: boolean;
+  /** Search bar placeholder text */
+  searchPlaceholder?: string;
+  /** Debounce delay in ms (default: 300) */
+  searchDebounceDelay?: number;
 }
 
 export const ChatList: React.FC<ChatListProps> = ({
@@ -25,8 +32,23 @@ export const ChatList: React.FC<ChatListProps> = ({
   conversations,
   selectedConversationId,
   handleSelectConversation,
+  hasSearchBar = false,
+  searchPlaceholder = "Search conversations...",
+  searchDebounceDelay = 300,
 }) => {
   const { currentUser } = useChatContext();
+  const [searchText, setSearchText] = useState("");
+  const debouncedSearch = useDebounce(searchText, searchDebounceDelay);
+
+  const filteredConversations = useMemo(() => {
+    if (!debouncedSearch.trim()) return conversations;
+    const query = debouncedSearch.toLowerCase();
+    return conversations.filter((c) => {
+      const nameMatch = c.name?.toLowerCase().includes(query);
+      const messageMatch = c.latestMessage?.text?.toLowerCase().includes(query);
+      return nameMatch || messageMatch;
+    });
+  }, [conversations, debouncedSearch]);
 
   return (
     <aside className="sidebar">
@@ -36,8 +58,50 @@ export const ChatList: React.FC<ChatListProps> = ({
           New
         </button>
       </div>
+      {hasSearchBar && (
+        <div className="search-bar-container" style={{ padding: "0 12px 8px" }}>
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="search-bar-input"
+              style={{
+                width: "100%",
+                padding: "8px 32px 8px 12px",
+                borderRadius: "8px",
+                border: "1px solid #e5e7eb",
+                fontSize: "14px",
+                outline: "none",
+                backgroundColor: "#f9fafb",
+              }}
+            />
+            {searchText && (
+              <button
+                onClick={() => setSearchText("")}
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#9ca3af",
+                  fontSize: "16px",
+                  padding: "0 4px",
+                  lineHeight: "1",
+                }}
+              >
+                &times;
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="conversation-list">
-        {conversations.map((c) => (
+        {filteredConversations.map((c) => (
           <button
             key={c.id}
             className={`conversation-item ${
@@ -53,6 +117,7 @@ export const ChatList: React.FC<ChatListProps> = ({
                   name: c.name,
                   id:
                     (c.members ?? []).find((m: string) => m !== currentUser?.id) || "",
+                  avatar: c.image,
                 }}
               />
             </div>
@@ -70,6 +135,11 @@ export const ChatList: React.FC<ChatListProps> = ({
             )}
           </button>
         ))}
+        {hasSearchBar && debouncedSearch && filteredConversations.length === 0 && (
+          <div style={{ padding: "16px", textAlign: "center", color: "#9ca3af", fontSize: "14px" }}>
+            No conversations found
+          </div>
+        )}
       </div>
     </aside>
   );
