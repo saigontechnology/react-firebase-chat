@@ -99,15 +99,15 @@ export class ChatService {
 
   // Collections getter with prefix support
   private get CONVERSATIONS() {
-    return this.getCollectionName('conversations');
+    return this.getCollectionName(FireStoreCollection.conversations);
   }
 
   private get MESSAGES() {
-    return this.getCollectionName('messages');
+    return this.getCollectionName(FireStoreCollection.messages);
   }
 
   private get USERS() {
-    return this.getCollectionName('users');
+    return this.getCollectionName(FireStoreCollection.users);
   }
 
   // Create conversation (same logic as RN app) - as per documentation
