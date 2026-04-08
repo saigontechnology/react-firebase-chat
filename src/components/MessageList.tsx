@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { format, isToday, isYesterday, isSameDay } from "date-fns";
 import { Message, MessageListProps, IUser } from "../types";
 import { UserAvatar } from "./UserAvatar";
@@ -59,31 +58,13 @@ const MessageItem = React.memo(function MessageItem({
 }: MessageItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
-  const [showActions, setShowActions] = useState(false);
 
-  const handleEdit = () => {
-    if (onUpdate && editText.trim() !== message.text) {
-      onUpdate({ ...message, text: editText.trim() });
-    }
-    setIsEditing(false);
-  };
+  const formattedTime = useMemo(
+    () => format(message.createdAt, "h:mm a"),
+    [message.createdAt]
+  );
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleEdit();
-    } else if (e.key === "Escape") {
-      setEditText(message.text);
-      setIsEditing(false);
-    }
-  };
-
-  const formatTime = (date: number) => {
-    return format(date, "h:mm a");
-  };
-
-  // Border radius logic: group consecutive messages
-  const getBubbleRadius = () => {
+  const bubbleRadius = useMemo(() => {
     const base = "18px";
     const small = "4px";
     if (isOwn) {
@@ -93,179 +74,183 @@ const MessageItem = React.memo(function MessageItem({
         borderTopRightRadius: isFirstInGroup ? base : small,
         borderBottomRightRadius: isLastInGroup ? base : small,
       };
-    } else {
-      return {
-        borderTopRightRadius: base,
-        borderBottomRightRadius: base,
-        borderTopLeftRadius: isFirstInGroup ? base : small,
-        borderBottomLeftRadius: isLastInGroup ? base : small,
-      };
     }
-  };
+    return {
+      borderTopRightRadius: base,
+      borderBottomRightRadius: base,
+      borderTopLeftRadius: isFirstInGroup ? base : small,
+      borderBottomLeftRadius: isLastInGroup ? base : small,
+    };
+  }, [isOwn, isFirstInGroup, isLastInGroup]);
+
+  const handleEdit = useCallback(() => {
+    if (onUpdate && editText.trim() !== message.text) {
+      onUpdate({ ...message, text: editText.trim() });
+    }
+    setIsEditing(false);
+  }, [onUpdate, editText, message]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleEdit();
+    } else if (e.key === "Escape") {
+      setEditText(message.text);
+      setIsEditing(false);
+    }
+  }, [handleEdit, message.text]);
 
   return (
     <>
       {showDateSeparator && <DateSeparator date={message.createdAt} />}
 
+      {/* `group` enables CSS-only hover for timestamp + action buttons — no React state */}
       <div
-        className={`flex items-end px-3 ${
-          isLastInGroup ? "mb-2" : "mb-0.5"
+        className={`group flex items-end ${
+          isLastInGroup ? "mb-4" : "mb-0.5"
         } ${isOwn ? "flex-row-reverse" : "flex-row"}`}
-        onMouseEnter={() => setShowActions(true)}
-        onMouseLeave={() => setShowActions(false)}
-        >
-          {/* Avatar for other users — uses partner info if available */}
-          {!isOwn && (
-            <div className="w-8 h-8 mr-1.5 flex-shrink-0 self-end">
-              {showAvatar && (
-                <UserAvatar
-                  user={partnerUser || {
+      >
+        {/* Avatar slot for received messages */}
+        {!isOwn && (
+          <div className="w-8 h-8 mr-1.5 flex-shrink-0 self-end">
+            {showAvatar && (
+              <UserAvatar
+                user={
+                  partnerUser || {
                     id: otherUserId || message.userId,
                     name: otherUserId || message.userId,
-                  }}
-                  size="small"
-                />
-              )}
-            </div>
+                  }
+                }
+                size="small"
+              />
+            )}
+          </div>
+        )}
+
+        <div
+          className={`max-w-xs lg:max-w-sm relative flex flex-col ${
+            isOwn ? "items-end" : "items-start"
+          }`}
+        >
+          {/* Sender name for received group messages */}
+          {!isOwn && isFirstInGroup && partnerUser?.name && (
+            <span className="text-xs text-gray-500 mb-1 ml-1 hm-msg-sender-name">
+              {partnerUser.name}
+            </span>
           )}
 
+          {/* Bubble */}
           <div
-            className={`max-w-xs lg:max-w-sm relative ${
-              isOwn ? "items-end" : "items-start"
-            } flex flex-col`}
+            className={`px-3 py-2 relative ${
+              isOwn ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900"
+            }`}
+            style={bubbleRadius}
           >
-            {/* Sender name for received messages */}
-            {!isOwn && isFirstInGroup && partnerUser?.name && (
-              <span className="text-xs text-gray-500 mb-1 ml-1 hm-msg-sender-name">
-                {partnerUser.name}
-              </span>
-            )}
-            {/* Message bubble */}
-            <div
-              className={`px-3 py-2 relative ${
-                isOwn
-                  ? "bg-blue-500 text-white"
-                  : "bg-white text-gray-900 shadow-sm"
-              }`}
-              style={getBubbleRadius()}
-            >
-              {isEditing ? (
-                <textarea
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onBlur={handleEdit}
-                  className="w-full bg-transparent resize-none outline-none min-w-[160px]"
-                  autoFocus
-                />
-              ) : (
-                <>
-                  {message.type === "image" && message.metadata?.imageUrl ? (
-                    <div className="space-y-1">
-                      <img
-                        src={message.metadata.imageUrl}
-                        alt="Shared image"
-                        className="max-w-full h-auto rounded-xl"
-                        loading="lazy"
-                      />
-                      {message.text && (
-                        <p className="text-sm">{message.text}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm whitespace-pre-wrap break-words leading-snug">
-                      {message.text}
-                    </p>
-                  )}
-
-                  {message.updatedAt && (
-                    <span
-                      className={`text-xs ml-1 ${
-                        isOwn ? "text-blue-200" : "text-gray-400"
-                      }`}
-                    >
-                      (edited)
-                    </span>
-                  )}
-                </>
-              )}
-
-              {/* Timestamp inside bubble */}
-              <div
-                className={`text-right mt-0.5 text-xs ${
-                  isOwn ? "text-blue-200" : "text-gray-400"
-                }`}
-              >
-                {formatTime(message.createdAt)}
-              </div>
-            </div>
-
-            {/* Message status indicator (matching rn-firebase-chat) */}
-            {messageStatusEnable && isLastOwnMessage && (
-              <div className="mt-1 mr-1 self-end">
-                {customMessageStatus ? (
-                  customMessageStatus(!isSeen)
+            {isEditing ? (
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={handleEdit}
+                className="w-full bg-transparent resize-none outline-none min-w-[160px]"
+                autoFocus
+              />
+            ) : (
+              <>
+                {message.type === "image" && message.metadata?.imageUrl ? (
+                  <div className="space-y-1">
+                    <img
+                      src={message.metadata.imageUrl}
+                      alt="Shared image"
+                      className="max-w-full h-auto rounded-xl"
+                      loading="lazy"
+                    />
+                    {message.text && <p className="text-sm">{message.text}</p>}
+                  </div>
                 ) : (
-                  <span className="bg-gray-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                    {isSeen ? unReadSeenMessage : unReadSentMessage}
+                  <p className="text-sm whitespace-pre-wrap break-words leading-snug">
+                    {message.text}
+                  </p>
+                )}
+                {message.updatedAt && (
+                  <span
+                    className={`text-xs ml-1 ${
+                      isOwn ? "text-blue-200" : "text-gray-400"
+                    }`}
+                  >
+                    (edited)
                   </span>
                 )}
-              </div>
+              </>
             )}
           </div>
 
-          {/* Action buttons (edit/delete) */}
-          {showActions && isOwn && !isEditing && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex space-x-1 mx-2 self-center"
+          {/* Timestamp — always visible on last of group, hover pill on mid-group */}
+          {isLastInGroup ? (
+            <span
+              className={`text-xs text-gray-500 mt-0.5 px-2 py-0.5 ${
+                isOwn ? "self-end" : "self-start"
+              }`}
             >
-              <button
-                onClick={() => setIsEditing(true)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded"
-                title="Edit message"
+              {formattedTime}
+            </span>
+          ) : (
+            <span
+              className={`relative h-0 overflow-visible ${
+                isOwn ? "self-end" : "self-start"
+              }`}
+            >
+              <span
+                className={`absolute bottom-0 text-xs text-gray-600 bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-sm ${
+                  isOwn ? "right-0" : "left-0"
+                }`}
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </button>
-              <button
-                onClick={() => onDelete?.(message.id)}
-                className="p-1 text-gray-400 hover:text-red-600 rounded"
-                title="Delete message"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-              </button>
-            </motion.div>
+                {formattedTime}
+              </span>
+            </span>
+          )}
+
+          {/* Message status (Sent / Seen) */}
+          {messageStatusEnable && isLastOwnMessage && (
+            <div className="mt-1 mr-1 self-end">
+              {customMessageStatus ? (
+                customMessageStatus(!isSeen)
+              ) : (
+                <span className="bg-gray-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                  {isSeen ? unReadSeenMessage : unReadSentMessage}
+                </span>
+              )}
+            </div>
           )}
         </div>
-      </>
-    );
-  }
-);
+
+        {/* Action buttons — CSS-only visibility, zero React state updates on hover */}
+        {isOwn && !isEditing && (
+          <div className="flex space-x-1 mx-2 self-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              title="Edit message"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => onDelete?.(message.id)}
+              className="p-1 text-gray-400 hover:text-red-600 rounded"
+              title="Delete message"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+});
 
 export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }> = ({
   messages,
@@ -278,10 +263,18 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
   customMessageStatus,
   unReadSentMessage,
   unReadSeenMessage,
+  maxPageSize,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [pageCount, setPageCount] = useState(1);
+  const prevScrollHeightRef = useRef<number | null>(null);
+
+  // Reset pagination when conversation changes (messages go empty)
+  useEffect(() => {
+    if (messages.length === 0) setPageCount(1);
+  }, [messages.length]);
 
   useEffect(() => {
     if (autoScroll && messagesEndRef.current) {
@@ -289,33 +282,62 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
     }
   }, [messages, autoScroll]);
 
-  const handleScroll = () => {
-    if (containerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-      setAutoScroll(isAtBottom);
+  // Restore scroll position after prepending older messages
+  useLayoutEffect(() => {
+    if (prevScrollHeightRef.current !== null && containerRef.current) {
+      containerRef.current.scrollTop +=
+        containerRef.current.scrollHeight - prevScrollHeightRef.current;
+      prevScrollHeightRef.current = null;
     }
-  };
+  });
 
-  // Find last own message index
-  const lastOwnMessageIndex = messages.reduce((last, msg, index) => {
-    return msg.userId === currentUser.id ? index : last;
-  }, -1);
+  const displayedMessages = useMemo(() => {
+    if (!maxPageSize) return messages;
+    return messages.slice(Math.max(0, messages.length - pageCount * maxPageSize));
+  }, [messages, pageCount, maxPageSize]);
 
-  // Check if the last own message has been seen by anyone else
-  const isLastOwnMessageSeen = (() => {
+  const hasMore = !!maxPageSize && messages.length > pageCount * maxPageSize;
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || !containerRef.current) return;
+    prevScrollHeightRef.current = containerRef.current.scrollHeight;
+    setPageCount((p) => p + 1);
+  }, [hasMore]);
+
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    setAutoScroll(scrollHeight - scrollTop - clientHeight < 100);
+    if (scrollTop < 40) loadMore();
+  }, [loadMore]);
+
+  // O(1) partner lookup — rebuilt only when partnerUsers reference changes
+  const partnerUserMap = useMemo(() => {
+    const map = new Map<string, IUser>();
+    partnerUsers?.forEach((u) => map.set(u.id, u));
+    return map;
+  }, [partnerUsers]);
+
+  const lastOwnMessageIndex = useMemo(
+    () =>
+      displayedMessages.reduce(
+        (last, msg, index) => (msg.userId === currentUser.id ? index : last),
+        -1
+      ),
+    [displayedMessages, currentUser.id]
+  );
+
+  const isLastOwnMessageSeen = useMemo(() => {
     if (lastOwnMessageIndex < 0) return false;
-    const lastMsg = messages[lastOwnMessageIndex];
+    const lastMsg = displayedMessages[lastOwnMessageIndex];
     return Object.entries(lastMsg.readBy || {}).some(
       ([uid, read]) => uid !== currentUser.id && read
     );
-  })();
+  }, [displayedMessages, lastOwnMessageIndex, currentUser.id]);
 
   if (messages.length === 0) {
     return (
-      <div
-        className={`flex-1 flex items-center justify-center p-8 bg-gray-100 ${className}`}
-      >
+      <div className={`flex-1 flex items-center justify-center p-8 bg-white ${className}`}>
         <div className="text-center text-gray-500">
           <div className="text-4xl mb-4">💬</div>
           <p className="text-lg font-medium">No messages yet</p>
@@ -329,63 +351,58 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className={`flex-1 overflow-y-auto bg-gray-100 py-2 ${className}`}
+      className={`flex-1 overflow-y-auto bg-white px-4 py-4 ${className}`}
     >
-      <AnimatePresence>
-        {messages.map((message, index) => {
-          const isOwn = message.userId === currentUser.id;
+      {hasMore && (
+        <div className="flex justify-center py-2">
+          <button
+            onClick={loadMore}
+            className="text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full transition-colors"
+          >
+            Load earlier messages
+          </button>
+        </div>
+      )}
+      {displayedMessages.map((message, index) => {
+        const isOwn = message.userId === currentUser.id;
+        const prevMessage = index > 0 ? displayedMessages[index - 1] : null;
+        const nextMessage = index < displayedMessages.length - 1 ? displayedMessages[index + 1] : null;
 
-          const prevMessage = index > 0 ? messages[index - 1] : null;
-          const nextMessage =
-            index < messages.length - 1 ? messages[index + 1] : null;
+        const isFirstInGroup = !prevMessage || prevMessage.userId !== message.userId;
+        const isLastInGroup = !nextMessage || nextMessage.userId !== message.userId;
+        const showDateSeparator =
+          !prevMessage ||
+          !isSameDay(new Date(message.createdAt), new Date(prevMessage.createdAt));
+        const showAvatar = !isOwn && isLastInGroup;
+        const isLastOwnMessage = isOwn && index === lastOwnMessageIndex;
 
-          const isFirstInGroup =
-            !prevMessage || prevMessage.userId !== message.userId;
-          const isLastInGroup =
-            !nextMessage || nextMessage.userId !== message.userId;
+        // Fallback: first partner in list if per-user lookup misses
+        const partnerUser =
+          partnerUserMap.get(message.userId) ?? partnerUsers?.[0];
 
-          const showDateSeparator =
-            !prevMessage ||
-            !isSameDay(
-              new Date(message.createdAt),
-              new Date(prevMessage.createdAt)
-            );
-
-          // For other-user avatars, show only on last message of their group
-          const showAvatar = !isOwn && isLastInGroup;
-
-          const isLastOwnMessage =
-            isOwn && index === lastOwnMessageIndex;
-
-          return (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <MessageItem
-                message={message}
-                isOwn={isOwn}
-                showAvatar={showAvatar}
-                isFirstInGroup={isFirstInGroup}
-                isLastInGroup={isLastInGroup}
-                showDateSeparator={showDateSeparator}
-                isLastOwnMessage={isLastOwnMessage}
-                isSeen={isLastOwnMessageSeen}
-                otherUserId={message.userId}
-                partnerUser={partnerUsers?.find((p) => p.id === message.userId) || partnerUsers?.[0]}
-                onUpdate={onMessageUpdate}
-                onDelete={onMessageDelete}
-                messageStatusEnable={messageStatusEnable}
-                customMessageStatus={customMessageStatus}
-                unReadSentMessage={unReadSentMessage}
-                unReadSeenMessage={unReadSeenMessage}
-              />
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+        return (
+          <div key={message.id} className="animate-fade-in">
+            <MessageItem
+              message={message}
+              isOwn={isOwn}
+              showAvatar={showAvatar}
+              isFirstInGroup={isFirstInGroup}
+              isLastInGroup={isLastInGroup}
+              showDateSeparator={showDateSeparator}
+              isLastOwnMessage={isLastOwnMessage}
+              isSeen={isLastOwnMessageSeen}
+              otherUserId={message.userId}
+              partnerUser={partnerUser}
+              onUpdate={onMessageUpdate}
+              onDelete={onMessageDelete}
+              messageStatusEnable={messageStatusEnable}
+              customMessageStatus={customMessageStatus}
+              unReadSentMessage={unReadSentMessage}
+              unReadSeenMessage={unReadSeenMessage}
+            />
+          </div>
+        );
+      })}
       <div ref={messagesEndRef} />
     </div>
   );
