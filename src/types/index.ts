@@ -328,6 +328,8 @@ export interface MessageListProps {
   customMessageStatus?: (hasUnread: boolean) => React.ReactNode;
   unReadSentMessage?: string;
   unReadSeenMessage?: string;
+  /** Max messages to display per page; scroll to top loads the previous page */
+  maxPageSize?: number;
 }
 
 export interface MessageInputProps {

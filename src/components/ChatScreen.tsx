@@ -101,7 +101,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   onLoadEnd,
   sendMessageNotification,
   timeoutSendNotify = DEFAULT_CLEAR_SEND_NOTIFICATION,
-  hasSearchBar = false,
+  hasSearchBar = true,
   searchPlaceholder,
   searchDebounceDelay,
 }) => {
@@ -411,11 +411,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   return (
     <div className={`chat-screen ${className}`} style={style}>
-      {/* App Header */}
-      {renderHeader ? renderHeader() : <ChatHeader currentUser={currentUser} />}
 
       {/* Main Content */}
-      <div className="main-content">
+      <div className={`main-content${selectedConversationId ? " has-conversation" : ""}`}>
         {/* Sidebar - Conversations */}
         {renderChatList ? (
           renderChatList({
@@ -441,98 +439,103 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
         {/* Chat Panel */}
         <section className="chat-panel">
-          <div className="chat-panel-header">
-            <div className="chat-target">
-              <span className="target-name">
-                {customConversationInfo?.name ||
+          {!selectedConversationId ? (
+            <div className="chat-panel-empty">
+              <div className="chat-panel-empty-icon">
+                <svg width="64" height="64" fill="none" viewBox="0 0 24 24" stroke="#d1d5db">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <p className="chat-panel-empty-title">Select a conversation</p>
+              <p className="chat-panel-empty-subtitle">Choose a conversation from the list to start messaging</p>
+            </div>
+          ) : (
+            <>
+              {/* App Header */}
+              { renderHeader ? renderHeader() :
+                <ChatHeader
+                name={
+                  customConversationInfo?.name ||
                   selectedName ||
                   selectedPartners[0]?.name ||
-                  "..."}
-              </span>
-            </div>
-            <div className="chat-actions">
-              <ButtonMaterialIcon
-                className="icon-btn"
-                title="Voice call"
-                icon="call"
-              />
-              <ButtonMaterialIcon
-                className="icon-btn"
-                title="Video call"
-                icon="videocam"
-              />
-            </div>
-          </div>
+                  "..."
+                }
+                partner={selectedPartners[0] ?? null}
+                onBack={() => setSelectedConversationId(undefined)}
+              />}
 
-          <div className="messages-container">
-            {loading ? (
-              <div className="panel-loading">
-                <div className="spinner" />
+              <div className="messages-container">
+                {loading ? (
+                  <div className="panel-loading">
+                    <div className="spinner" />
+                  </div>
+                ) : (
+                  <>
+                    <MessageList
+                      messages={messages}
+                      currentUser={convertedUser}
+                      partnerUsers={selectedPartners}
+                      onMessageUpdate={(message) =>
+                        console.log("Message updated:", message)
+                      }
+                      onMessageDelete={(messageId) =>
+                        console.log("Delete message:", messageId)
+                      }
+                      messageStatusEnable={messageStatusEnable}
+                      customMessageStatus={customMessageStatus}
+                      unReadSentMessage={unReadSentMessage}
+                      unReadSeenMessage={unReadSeenMessage}
+                      maxPageSize={maxPageSize}
+                    />
+                    {enableTyping && <TypingIndicator typingUsers={typingUsers} />}
+                  </>
+                )}
               </div>
-            ) : (
-              <>
-                <MessageList
-                  messages={messages}
-                  currentUser={convertedUser}
-                  partnerUsers={selectedPartners}
-                  onMessageUpdate={(message) =>
-                    console.log("Message updated:", message)
-                  }
-                  onMessageDelete={(messageId) =>
-                    console.log("Delete message:", messageId)
-                  }
-                  messageStatusEnable={messageStatusEnable}
-                  customMessageStatus={customMessageStatus}
-                  unReadSentMessage={unReadSentMessage}
-                  unReadSeenMessage={unReadSeenMessage}
-                />
-                {enableTyping && <TypingIndicator typingUsers={typingUsers} />}
-              </>
-            )}
-          </div>
 
-          <div className="panel-input">
-            <div
-              className="input-box"
-              style={inputToolbarProps?.containerStyle}
-            >
-              {/* Camera button from inputToolbarProps */}
-              {showCamera && (
-                <ButtonMaterialIcon
-                  className="attach-btn"
-                  title="Camera"
-                  icon={inputToolbarProps?.cameraIcon || "photo_camera"}
-                  onClick={inputToolbarProps?.onPressCamera}
-                />
-              )}
-              {/* Gallery button from inputToolbarProps */}
-              {showGallery && (
-                <ButtonMaterialIcon
-                  className="attach-btn"
-                  title="Gallery"
-                  icon={inputToolbarProps?.galleryIcon || "photo_library"}
-                  onClick={inputToolbarProps?.onPressGallery}
-                />
-              )}
-              {/* Default file upload button */}
-              {showFileUploadBtn && (
-                <ButtonMaterialIcon
-                  className="attach-btn"
-                  title="Attach file"
-                  icon="attach_file"
-                  onClick={() => setShowUploader(true)}
-                />
-              )}
-              <div className="input-flex">
-                <MessageInput
-                  onSendMessage={handleSendTextMessage}
-                  onTyping={handleTyping}
-                  placeholder="Type your message..."
-                  className="message-input-reset"
-                />
+              <div className="panel-input">
+                <div
+                  className="input-box"
+                  style={inputToolbarProps?.containerStyle}
+                >
+                  {/* Camera button from inputToolbarProps */}
+                  {showCamera && (
+                    <ButtonMaterialIcon
+                      className="attach-btn"
+                      title="Camera"
+                      icon={inputToolbarProps?.cameraIcon || "photo_camera"}
+                      onClick={inputToolbarProps?.onPressCamera}
+                    />
+                  )}
+                  {/* Gallery button from inputToolbarProps */}
+                  {showGallery && (
+                    <ButtonMaterialIcon
+                      className="attach-btn"
+                      title="Gallery"
+                      icon={inputToolbarProps?.galleryIcon || "photo_library"}
+                      onClick={inputToolbarProps?.onPressGallery}
+                    />
+                  )}
+                  {/* Default file upload button */}
+                  {showFileUploadBtn && (
+                    <ButtonMaterialIcon
+                      className="attach-btn"
+                      title="Attach file"
+                      icon="attach_file"
+                      onClick={() => setShowUploader(true)}
+                    />
+                  )}
+                  <div className="input-flex">
+                    <MessageInput
+                      onSendMessage={handleSendTextMessage}
+                      onTyping={handleTyping}
+                      placeholder="Type your message..."
+                      className="message-input-reset"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </section>
       </div>
 

@@ -11,6 +11,7 @@ export * from './services/user';
 
 // React components
 export * from './components/ChatScreen';
+export * from './components/ChatHeader';
 export * from './components/MessageList';
 export * from './components/MessageInput';
 export * from './components/UserAvatar';

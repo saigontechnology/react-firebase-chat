@@ -82,8 +82,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   return (
-    <div className={`w-full flex items-stretch space-x-2 bg-white ${className}`}>
-      <div className="flex-1 relative" style={{height: '40px'}}>
+    <div className={`w-full flex items-end gap-2 ${className}`}>
+      <div className="flex-1 flex items-center bg-gray-100 rounded-3xl px-4 py-2 min-h-[40px]">
         <TextareaAutosize
           ref={textareaRef}
           value={message}
@@ -95,24 +95,27 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           maxRows={5}
           minRows={1}
           className={`
-            w-full px-2 py-2 border-0 rounded-md resize-none bg-transparent text-gray-900 placeholder-gray-400
-            focus:outline-none focus:ring-0 focus:border-transparent
-            disabled:bg-transparent disabled:cursor-not-allowed
+            flex-1 bg-transparent resize-none text-gray-900 placeholder-gray-400
+            focus:outline-none focus:ring-0
+            disabled:cursor-not-allowed
           `}
+          style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
         />
-
       </div>
 
       <ButtonMaterialIcon
         onClick={handleSend}
         disabled={disabled || !message.trim()}
-        className={`
-          self-stretch rounded-lg font-medium transition-colors flex items-center justify-center
-          ${disabled || !message.trim() ? '' : ''}
-        `}
+        className="flex items-center justify-center flex-shrink-0"
         style={{
-          background: disabled || !message.trim() ? '#e5e7eb' : '#1e88e5',
+          background: disabled || !message.trim() ? '#e5e7eb' : '#3b82f6',
           color: disabled || !message.trim() ? '#9ca3af' : '#fff',
+          borderRadius: '50%',
+          width: '40px',
+          height: '40px',
+          border: 'none',
+          cursor: disabled || !message.trim() ? 'not-allowed' : 'pointer',
+          transition: 'background 0.15s ease',
         }}
         title="Send message (Enter)"
         icon="send"

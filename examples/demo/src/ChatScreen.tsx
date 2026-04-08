@@ -56,6 +56,9 @@ export default function ChatScreen({ currentUser }: Props) {
               conversationId={activeConversation}
               currentUserId={currentUser.id}
               memberIds={[currentUser.id, recipientId.trim()]}
+              onLogout={() => {
+                setActiveConversation(null);
+              }}
             />
           </ChatProvider>
         </div>
