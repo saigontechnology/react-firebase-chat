@@ -47,8 +47,3 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
-
-# Lock files (let users choose their package manager)
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
