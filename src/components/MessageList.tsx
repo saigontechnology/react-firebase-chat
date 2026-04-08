@@ -12,14 +12,13 @@ interface MessageItemProps {
   showDateSeparator: boolean;
   isLastOwnMessage: boolean;
   isSeen: boolean;
-  otherUserId?: string;
   partnerUser?: IUser;
   onUpdate?: (message: Message) => void;
   onDelete?: (messageId: string) => void;
   messageStatusEnable?: boolean;
   customMessageStatus?: (hasUnread: boolean) => React.ReactNode;
-  unReadSentMessage?: string;
-  unReadSeenMessage?: string;
+  sentMessageLabel?: string;
+  seenMessageLabel?: string;
 }
 
 const DateSeparator: React.FC<{ date: number }> = ({ date }) => {
@@ -38,6 +37,47 @@ const DateSeparator: React.FC<{ date: number }> = ({ date }) => {
   );
 };
 
+const MessageStatus: React.FC<{ isSeen: boolean; sentLabel?: string; seenLabel?: string }> = ({
+  isSeen,
+  sentLabel = "Sent",
+  seenLabel = "Seen",
+}) => (
+  <span
+    className="flex items-center gap-0.5"
+    title={isSeen ? seenLabel : sentLabel}
+    aria-label={isSeen ? seenLabel : sentLabel}
+  >
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={isSeen ? "#3b82f6" : "#9ca3af"}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+
+    {isSeen && (
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#3b82f6"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ marginLeft: "-8px" }}
+      >
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    )}
+  </span>
+);
+
 const MessageItem = React.memo(function MessageItem({
   message,
   isOwn,
@@ -47,17 +87,21 @@ const MessageItem = React.memo(function MessageItem({
   showDateSeparator,
   isLastOwnMessage,
   isSeen,
-  otherUserId,
   partnerUser,
   onUpdate,
   onDelete,
   messageStatusEnable = true,
   customMessageStatus,
-  unReadSentMessage = "Sent",
-  unReadSeenMessage = "Seen",
+  sentMessageLabel = "Sent",
+  seenMessageLabel = "Seen",
 }: MessageItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
+
+  // Sync edit buffer when the message is updated externally
+  useEffect(() => {
+    if (!isEditing) setEditText(message.text);
+  }, [message.text, isEditing]);
 
   const formattedTime = useMemo(
     () => format(message.createdAt, "h:mm a"),
@@ -101,7 +145,7 @@ const MessageItem = React.memo(function MessageItem({
   }, [handleEdit, message.text]);
 
   return (
-    <>
+    <div className="animate-fade-in">
       {showDateSeparator && <DateSeparator date={message.createdAt} />}
 
       {/* `group` enables CSS-only hover for timestamp + action buttons — no React state */}
@@ -115,12 +159,7 @@ const MessageItem = React.memo(function MessageItem({
           <div className="w-8 h-8 mr-1.5 flex-shrink-0 self-end">
             {showAvatar && (
               <UserAvatar
-                user={
-                  partnerUser || {
-                    id: otherUserId || message.userId,
-                    name: otherUserId || message.userId,
-                  }
-                }
+                user={partnerUser || { id: message.userId, name: message.userId }}
                 size="small"
               />
             )}
@@ -146,6 +185,17 @@ const MessageItem = React.memo(function MessageItem({
             }`}
             style={bubbleRadius}
           >
+            {/* Mid-group timestamp — above the bubble, no layout impact */}
+            {!isLastInGroup && (
+              <span
+                className={`absolute -top-6 text-xs text-gray-600 bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-sm ${
+                  isOwn ? "right-0" : "left-0"
+                }`}
+              >
+                {formattedTime}
+              </span>
+            )}
+
             {isEditing ? (
               <textarea
                 value={editText}
@@ -173,11 +223,7 @@ const MessageItem = React.memo(function MessageItem({
                   </p>
                 )}
                 {message.updatedAt && (
-                  <span
-                    className={`text-xs ml-1 ${
-                      isOwn ? "text-blue-200" : "text-gray-400"
-                    }`}
-                  >
+                  <span className={`text-xs ml-1 ${isOwn ? "text-blue-200" : "text-gray-400"}`}>
                     (edited)
                   </span>
                 )}
@@ -185,8 +231,8 @@ const MessageItem = React.memo(function MessageItem({
             )}
           </div>
 
-          {/* Timestamp — always visible on last of group, hover pill on mid-group */}
-          {isLastInGroup ? (
+          {/* Timestamp — always visible on last of group */}
+          {isLastInGroup && (
             <span
               className={`text-xs text-gray-500 mt-0.5 px-2 py-0.5 ${
                 isOwn ? "self-end" : "self-start"
@@ -194,31 +240,15 @@ const MessageItem = React.memo(function MessageItem({
             >
               {formattedTime}
             </span>
-          ) : (
-            <span
-              className={`relative h-0 overflow-visible ${
-                isOwn ? "self-end" : "self-start"
-              }`}
-            >
-              <span
-                className={`absolute bottom-0 text-xs text-gray-600 bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-sm ${
-                  isOwn ? "right-0" : "left-0"
-                }`}
-              >
-                {formattedTime}
-              </span>
-            </span>
           )}
 
-          {/* Message status (Sent / Seen) */}
+          {/* Message status */}
           {messageStatusEnable && isLastOwnMessage && (
-            <div className="mt-1 mr-1 self-end">
+            <div className="mt-0.5 mr-1 self-end">
               {customMessageStatus ? (
                 customMessageStatus(!isSeen)
               ) : (
-                <span className="bg-gray-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                  {isSeen ? unReadSeenMessage : unReadSentMessage}
-                </span>
+                <MessageStatus isSeen={isSeen} sentLabel={sentMessageLabel} seenLabel={seenMessageLabel} />
               )}
             </div>
           )}
@@ -248,7 +278,7 @@ const MessageItem = React.memo(function MessageItem({
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 });
 
@@ -318,22 +348,15 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
     return map;
   }, [partnerUsers]);
 
-  const lastOwnMessageIndex = useMemo(
-    () =>
-      displayedMessages.reduce(
-        (last, msg, index) => (msg.userId === currentUser.id ? index : last),
-        -1
-      ),
-    [displayedMessages, currentUser.id]
-  );
+  const lastMessage = displayedMessages[displayedMessages.length - 1];
+  const lastMessageIndex = displayedMessages.length - 1;
 
   const isLastOwnMessageSeen = useMemo(() => {
-    if (lastOwnMessageIndex < 0) return false;
-    const lastMsg = displayedMessages[lastOwnMessageIndex];
-    return Object.entries(lastMsg.readBy || {}).some(
+    if (!lastMessage || lastMessage.userId !== currentUser.id) return false;
+    return Object.entries(lastMessage.readBy || {}).some(
       ([uid, read]) => uid !== currentUser.id && read
     );
-  }, [displayedMessages, lastOwnMessageIndex, currentUser.id]);
+  }, [lastMessage, currentUser.id]);
 
   if (messages.length === 0) {
     return (
@@ -373,34 +396,26 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
         const showDateSeparator =
           !prevMessage ||
           !isSameDay(new Date(message.createdAt), new Date(prevMessage.createdAt));
-        const showAvatar = !isOwn && isLastInGroup;
-        const isLastOwnMessage = isOwn && index === lastOwnMessageIndex;
-
-        // Fallback: first partner in list if per-user lookup misses
-        const partnerUser =
-          partnerUserMap.get(message.userId) ?? partnerUsers?.[0];
 
         return (
-          <div key={message.id} className="animate-fade-in">
-            <MessageItem
-              message={message}
-              isOwn={isOwn}
-              showAvatar={showAvatar}
-              isFirstInGroup={isFirstInGroup}
-              isLastInGroup={isLastInGroup}
-              showDateSeparator={showDateSeparator}
-              isLastOwnMessage={isLastOwnMessage}
-              isSeen={isLastOwnMessageSeen}
-              otherUserId={message.userId}
-              partnerUser={partnerUser}
-              onUpdate={onMessageUpdate}
-              onDelete={onMessageDelete}
-              messageStatusEnable={messageStatusEnable}
-              customMessageStatus={customMessageStatus}
-              unReadSentMessage={unReadSentMessage}
-              unReadSeenMessage={unReadSeenMessage}
-            />
-          </div>
+          <MessageItem
+            key={message.id}
+            message={message}
+            isOwn={isOwn}
+            showAvatar={!isOwn && isLastInGroup}
+            isFirstInGroup={isFirstInGroup}
+            isLastInGroup={isLastInGroup}
+            showDateSeparator={showDateSeparator}
+            isLastOwnMessage={isOwn && index === lastMessageIndex}
+            isSeen={isLastOwnMessageSeen}
+            partnerUser={partnerUserMap.get(message.userId) ?? partnerUsers?.[0]}
+            onUpdate={onMessageUpdate}
+            onDelete={onMessageDelete}
+            messageStatusEnable={messageStatusEnable}
+            customMessageStatus={customMessageStatus}
+            sentMessageLabel={unReadSentMessage}
+            seenMessageLabel={unReadSeenMessage}
+          />
         );
       })}
       <div ref={messagesEndRef} />
