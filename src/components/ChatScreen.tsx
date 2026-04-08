@@ -105,7 +105,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   searchPlaceholder,
   searchDebounceDelay,
 }) => {
-  const { currentUser, derivedKey, enableEncrypt: _enableEncrypt, blackListRegex, prefix, storageProvider } =
+  const { currentUser, derivedKey, blackListRegex, prefix, storageProvider } =
     useChatContext();
   const [showUploader, setShowUploader] = useState(false);
 
