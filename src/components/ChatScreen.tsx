@@ -90,7 +90,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   renderChatNewModal,
   inputToolbarProps,
   customConversationInfo,
-  maxPageSize = 50,
+  maxPageSize: _maxPageSize = 50,
   messageStatusEnable = true,
   customMessageStatus,
   unReadSentMessage,
@@ -105,7 +105,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   searchPlaceholder,
   searchDebounceDelay,
 }) => {
-  const { currentUser, derivedKey, enableEncrypt, blackListRegex, prefix, storageProvider } =
+  const { currentUser, derivedKey, enableEncrypt: _enableEncrypt, blackListRegex, prefix, storageProvider } =
     useChatContext();
   const [showUploader, setShowUploader] = useState(false);
 
