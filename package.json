@@ -1,6 +1,6 @@
 {
   "name": "@saigontechnology/react-firebase-chat",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A comprehensive ReactJS Firebase Chat library with real-time messaging, user authentication, and modern UI components",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,7 +34,7 @@
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "preversion": "npm run lint",
-    "version": "npm run build && git add -A dist",
+    "version": "npm run build",
     "postversion": "git push && git push --tags",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
