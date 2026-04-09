@@ -136,8 +136,8 @@ export class ChatService {
         type,
         names,
         unRead,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         latestMessage: null,
         latestMessageTime: null,
         createdBy: initiatorId,
@@ -339,8 +339,8 @@ export class ChatService {
           name: names[userId] || '',
           members: data.members || [],
           unRead: unreadCounts,
-          updatedAt: data.updatedAt ? new Date(data.updatedAt).valueOf() : Date.now(),
-          joinedAt: data.createdAt ? new Date(data.createdAt).valueOf() : Date.now(),
+          updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? Date.now(),
+          joinedAt: data.createdAt?.toMillis?.() ?? data.createdAt ?? Date.now(),
           latestMessage: data.latestMessage || undefined,
         });
       });
