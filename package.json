@@ -21,7 +21,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "npm run clean && tsc && npm run build:css",
+    "build": "pnpm run clean && tsc && pnpm run build:css",
     "build:css": "postcss src/styles.css -d dist && postcss src/components/*.css -d dist/components && postcss src/addons/*/*.css -d dist/addons --base src/addons && postcss src/styles/index.css -d dist/styles",
     "clean": "rm -rf dist",
     "dev": "tsc --watch",
@@ -31,17 +31,18 @@
     "lint:fix": "eslint src/**/*.{ts,tsx} --fix",
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run build",
-    "preversion": "npm run lint",
-    "version": "npm run build",
+    "prepare": "pnpm run build",
+    "prepublishOnly": "pnpm run build",
+    "preversion": "pnpm run lint",
+    "version": "pnpm run build && git add -A dist",
     "postversion": "git push && git push --tags",
-    "release:patch": "npm version patch && npm publish",
-    "release:minor": "npm version minor && npm publish",
-    "release:major": "npm version major && npm publish",
-    "release:beta": "npm version prerelease --preid=beta && npm publish --tag beta",
-    "dry-run": "npm publish --dry-run"
+    "release:patch": "pnpm version patch && pnpm publish",
+    "release:minor": "pnpm version minor && pnpm publish",
+    "release:major": "pnpm version major && pnpm publish",
+    "release:beta": "pnpm version prerelease --preid=beta && pnpm publish --tag beta",
+    "dry-run": "pnpm publish --dry-run"
   },
+  "packageManager": "pnpm@10.27.0",
   "keywords": [
     "react",
     "firebase",
