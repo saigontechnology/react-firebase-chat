@@ -54,8 +54,7 @@ export default function ChatScreen({ currentUser }: Props) {
           <ChatProvider currentUser={currentUser}>
             <LibChatScreen
               conversationId={activeConversation}
-              currentUserId={currentUser.id}
-              memberIds={[currentUser.id, recipientId.trim()]}
+              partners={[{ id: recipientId.trim(), name: recipientId.trim() }]}
             />
           </ChatProvider>
         </div>

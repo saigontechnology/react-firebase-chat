@@ -6,6 +6,7 @@ import {
   deleteDoc,
   setDoc,
   query,
+  where,
   orderBy,
   limit,
   startAfter,
@@ -21,6 +22,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFirebaseFirestore, getFirebaseStorage } from './firebase';
 import { UserService } from './user';
 import {
+  ConversationProps,
   FireStoreCollection,
   IMessage,
   MediaType,
@@ -121,15 +123,24 @@ export class ChatService {
     memberAvatars?: Record<string, string>,
   ): Promise<string> {
     try {
+      // Per-user names: initiator sees otherName, others see initiator's name
+      const names: Record<string, string> = {};
+      const unRead: Record<string, number> = {};
+      memberIds.forEach((id) => {
+        names[id] = id === initiatorId ? (otherName || '') : (name || '');
+        unRead[id] = 0;
+      });
+
       const conversationData = {
         members: memberIds,
         type,
-        name: otherName || '',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        names,
+        unRead,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
         latestMessage: null,
         latestMessageTime: null,
-        createdBy: initiatorId
+        createdBy: initiatorId,
       };
 
       let docRefId: string;
@@ -138,7 +149,7 @@ export class ChatService {
         await updateDoc(
           doc(this.db, this.CONVERSATIONS, conversationId),
           conversationData
-        ).catch(async (_err) => {
+        ).catch(async () => {
           await setDoc(
             doc(this.db, this.CONVERSATIONS, conversationId),
             conversationData
@@ -153,28 +164,9 @@ export class ChatService {
         docRefId = docRef.id;
       }
 
-      // Create user conversation references for each member
-      const promises = memberIds.map(async (memberId) => {
-        await this.userService.createUserIfNotExists(memberId);
+      // Ensure user documents exist for all members
+      await Promise.all(memberIds.map((id) => this.userService.createUserIfNotExists(id)));
 
-        const chatName = memberId === initiatorId ? otherName : name;
-        // Store the partner's avatar as the conversation image for this member
-        const partnerId = memberIds.find(id => id !== memberId);
-        const partnerAvatar = partnerId && memberAvatars?.[partnerId];
-        await setDoc(
-          doc(this.db, this.USERS, memberId, 'conversations', docRefId),
-          {
-            joinedAt: serverTimestamp(),
-            unRead: 0,
-            updatedAt: serverTimestamp(),
-            members: memberIds,
-            name: chatName || '',
-            ...(partnerAvatar ? { image: partnerAvatar } : {}),
-          }
-        );
-      });
-
-      await Promise.all(promises);
       return docRefId;
     } catch (error) {
       console.error('Error creating conversation:', error);
@@ -206,7 +198,9 @@ export class ChatService {
   ): Promise<void> {
     try {
       const conversationExists = await this.conversationExists(conversationId);
-      const memberIds = conversationOptions?.memberIds || [String(message.senderId)];
+      const memberIds = conversationOptions?.memberIds && conversationOptions.memberIds.length > 1
+        ? conversationOptions.memberIds
+        : [String(message.senderId)];
 
       if (!conversationExists) {
         const initiatorId = String(message.senderId);
@@ -247,26 +241,27 @@ export class ChatService {
         }
       );
 
+      // Update unread counts for other members on the conversation document
       const conversationDoc = await getDoc(
         doc(this.db, this.CONVERSATIONS, conversationId)
       );
 
       if (conversationDoc.exists()) {
         const allMembers: string[] = conversationDoc.data()?.members || memberIds;
-        const updatePromises = allMembers.map(async (memberId: string) => {
-          const isSender = memberId === message.senderId;
-          await setDoc(
-            doc(this.db, this.USERS, memberId, 'conversations', conversationId),
-            {
-              unRead: increment(isSender ? 0 : 1),
-              updatedAt: serverTimestamp(),
-              latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', filteredText || ''),
-            },
-            { merge: true }
-          );
+        const unreadUpdates: Record<string, unknown> = {};
+        allMembers.forEach((memberId: string) => {
+          if (memberId !== message.senderId) {
+            unreadUpdates[`unRead.${memberId}`] = increment(1);
+          }
         });
 
-        await Promise.all(updatePromises);
+        await updateDoc(
+          doc(this.db, this.CONVERSATIONS, conversationId),
+          {
+            ...unreadUpdates,
+            latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', message.text || ''),
+          }
+        );
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -314,27 +309,38 @@ export class ChatService {
     });
   }
 
+  /**
+   * Get user's conversations from the top-level /conversations collection
+   * filtered by membership.
+   * @param userId - The ID of the user
+   * @param callback - Callback function to receive conversations
+   * @returns Unsubscribe function
+   */
   subscribeToUserConversations(
     userId: string,
-    callback: (userConversations: any[]) => void
+    callback: (userConversations: ConversationProps[]) => void
   ): () => void {
     this.userService.createUserIfNotExists(userId).catch(console.error);
 
     const userConversationsQuery = query(
-      collection(this.db, this.USERS, userId, 'conversations'),
+      collection(this.db, this.CONVERSATIONS),
+      where('members', 'array-contains', userId),
       orderBy('updatedAt', 'desc')
     );
 
     return onSnapshot(userConversationsQuery, (snapshot) => {
-      const userConversations: any[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+      const userConversations: ConversationProps[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const names: Record<string, string> = data.names || {};
+        const unreadCounts: Record<string, number> = data.unRead || {};
         userConversations.push({
-          id: doc.id,
-          ...data,
+          id: docSnap.id,
+          name: names[userId] || '',
           members: data.members || [],
-          updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? Date.now(),
-          joinedAt: data.createdAt?.toMillis?.() ?? data.createdAt ?? Date.now(),
+          unRead: unreadCounts,
+          updatedAt: data.updatedAt ? new Date(data.updatedAt).valueOf() : Date.now(),
+          joinedAt: data.createdAt ? new Date(data.createdAt).valueOf() : Date.now(),
           latestMessage: data.latestMessage || undefined,
         });
       });
@@ -382,12 +388,18 @@ export class ChatService {
     });
   }
 
-  // Update unread count
+  // Update unread count on the main conversation document
   async updateUnread(conversationId: string, userId: string): Promise<void> {
     try {
-      const conversationRef = doc(this.db, this.USERS, userId, 'conversations', conversationId);
-      await setDoc(conversationRef, { unRead: 0 }, { merge: true });
-    } catch (error) {
+      await updateDoc(
+        doc(this.db, this.CONVERSATIONS, conversationId),
+        { [`unRead.${userId}`]: 0 }
+      );
+    } catch (error: any) {
+      if (error?.code === 'not-found') {
+        // Conversation document doesn't exist yet, we can safely ignore
+        return;
+      }
       console.error('Error updating unread count:', error);
       throw new Error('Failed to update unread count');
     }

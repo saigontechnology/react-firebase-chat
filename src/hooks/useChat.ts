@@ -141,7 +141,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
       setError(err instanceof Error ? err.message : 'Failed to mark as read');
       throw err;
     }
-  }, [conversationId, user.id]);
+  }, [conversationId, user.id, chatService]);
 
   return {
     messages,

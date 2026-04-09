@@ -90,7 +90,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   renderChatNewModal,
   inputToolbarProps,
   customConversationInfo,
-  maxPageSize: _maxPageSize = 50,
+  maxPageSize = 50,
   messageStatusEnable = true,
   customMessageStatus,
   unReadSentMessage,
@@ -113,6 +113,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   // Keep a ref so the subscription callback always reads the latest key
   const derivedKeyRef = useRef(derivedKey);
+  // Track whether we've already auto-selected the first conversation
+  const hasAutoSelectedRef = useRef(!!conversationId);
   useEffect(() => {
     derivedKeyRef.current = derivedKey;
   }, [derivedKey]);
@@ -275,13 +277,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           })
         );
         setConversations(decrypted);
-        // If nothing selected, pick first (use ref to avoid stale closure)
-        if (!selectedConversationIdRef.current && decrypted.length > 0) {
-          const firstConv = decrypted[0];
-          selectedConversationIdRef.current = firstConv.id;
-          setSelectedConversationId(firstConv.id);
-          setSelectedName(firstConv.name || "");
-          resolvePartners(firstConv);
+        // Auto-select first conversation only once
+        if (!hasAutoSelectedRef.current && decrypted.length > 0) {
+          hasAutoSelectedRef.current = true;
+          const first = decrypted[0];
+          setSelectedConversationId(first.id);
+          setSelectedName(first.name || "");
+          setSelectedPartners(
+            (first.members ?? [])
+              .filter((m: string) => m !== `${currentUser?.id}`)
+              .map((m: string) => ({ id: m }))
+          );
         }
       }
     );
@@ -289,11 +295,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
+  // Reset unread count when a conversation is selected
   useEffect(() => {
     if (selectedConversationId) {
       markAsRead();
     }
-  }, [selectedConversationId, markAsRead]);
+  }, [selectedConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resolve partner avatars when conversations load and partners are missing avatar info
   // Fixed: removed selectedPartners from deps to prevent infinite loop
@@ -368,7 +375,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         console.error("Failed to start chat", e);
       }
     },
-    [currentUser?.id]
+    [currentUser?.id, currentUser?.name]
   );
 
   const handleFileUpload = useCallback(
