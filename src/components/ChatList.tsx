@@ -148,9 +148,8 @@ export const ChatList: React.FC<ChatListProps> = ({
         {filteredConversations.map((c) => (
           <button
             key={c.id}
-            className={`conversation-item ${
-              selectedConversationId === c.id ? "active" : ""
-            }`}
+            className={`conversation-item ${selectedConversationId === c.id ? "active" : ""
+              }`}
             onClick={() => {
               handleSelectConversation(c);
             }}
@@ -175,11 +174,11 @@ export const ChatList: React.FC<ChatListProps> = ({
                 <span className="conversation-last">
                   {c?.latestMessage?.text || ""}
                 </span>
-                {(c.unRead || 0) > 0 && (
-                  <span className="unread-badge">{c.unRead || 0}</span>
-                )}
               </div>
             </div>
+            {(c.unRead?.[currentUser?.id ?? ""] || 0) > 0 && (
+              <span className="unread-badge">{c.unRead?.[currentUser?.id ?? ""] || 0}</span>
+            )}
           </button>
         ))}
         {debouncedSearch && filteredConversations.length === 0 && (

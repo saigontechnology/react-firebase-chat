@@ -12,7 +12,7 @@
     "firebase": "^10.14.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@saigontechnology/react-firebase-chat": "workspace:*"
+    "@saigontechnology/react-firebase-chat": "file:../.."
   },
   "devDependencies": {
     "@types/react": "^18.3.1",

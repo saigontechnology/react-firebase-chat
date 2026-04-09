@@ -40,7 +40,7 @@ export interface IConversation {
   members: string[];
   latestMessage?: IMessage;
   latestMessageTime?: number;
-  unRead?: number;
+  unRead?: Record<string, number>;
   title?: string;
   type: 'private' | 'group';
   createdAt: number;
@@ -112,8 +112,9 @@ export interface ConversationProps {
   name?: string;
   image?: string;
   members: string[];
-  unRead?: number;
+  unRead?: Record<string, number>;
   updatedAt: number;
+  joinedAt?: number;
   latestMessage?: LatestMessageProps;
 }
 
