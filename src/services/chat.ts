@@ -120,7 +120,7 @@ export class ChatService {
     name?: string,
     otherName?: string,
     conversationId?: string,
-    memberAvatars?: Record<string, string>,
+    _memberAvatars?: Record<string, string>,
   ): Promise<string> {
     try {
       // Per-user names: initiator sees otherName, others see initiator's name

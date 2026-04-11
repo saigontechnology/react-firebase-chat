@@ -1,6 +1,6 @@
 {
   "name": "@saigontechnology/react-firebase-chat",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "A comprehensive ReactJS Firebase Chat library with real-time messaging, user authentication, and modern UI components",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
