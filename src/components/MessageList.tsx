@@ -13,8 +13,9 @@ interface MessageItemProps {
   isLastOwnMessage: boolean;
   isSeen: boolean;
   partnerUser?: IUser;
-  onUpdate?: (message: Message) => void;
   onDelete?: (messageId: string) => void;
+  onEdit?: (message: Message) => void;
+  onReply?: (message: Message) => void;
   messageStatusEnable?: boolean;
   customMessageStatus?: (hasUnread: boolean) => React.ReactNode;
   sentMessageLabel?: string;
@@ -78,6 +79,28 @@ const MessageStatus: React.FC<{ isSeen: boolean; sentLabel?: string; seenLabel?:
   </span>
 );
 
+/** Reply quote preview inside a bubble (matching rn-firebase-chat) */
+const ReplyPreview: React.FC<{ replyMessage: Message["replyMessage"]; isOwn: boolean }> = ({
+  replyMessage,
+  isOwn,
+}) => {
+  if (!replyMessage) return null;
+  return (
+    <div
+      className={`mb-1.5 px-2 py-1 rounded-lg border-l-4 text-xs max-w-full ${
+        isOwn
+          ? "bg-blue-400/30 border-blue-200 text-blue-100"
+          : "bg-gray-200 border-gray-400 text-gray-600"
+      }`}
+    >
+      {replyMessage.userName && (
+        <div className="font-semibold mb-0.5 truncate">{replyMessage.userName}</div>
+      )}
+      <div className="truncate opacity-90">{replyMessage.text}</div>
+    </div>
+  );
+};
+
 const MessageItem = React.memo(function MessageItem({
   message,
   isOwn,
@@ -88,21 +111,14 @@ const MessageItem = React.memo(function MessageItem({
   isLastOwnMessage,
   isSeen,
   partnerUser,
-  onUpdate,
   onDelete,
+  onEdit,
+  onReply,
   messageStatusEnable = true,
   customMessageStatus,
   sentMessageLabel = "Sent",
   seenMessageLabel = "Seen",
 }: MessageItemProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(message.text);
-
-  // Sync edit buffer when the message is updated externally
-  useEffect(() => {
-    if (!isEditing) setEditText(message.text);
-  }, [message.text, isEditing]);
-
   const formattedTime = useMemo(
     () => format(message.createdAt, "h:mm a"),
     [message.createdAt]
@@ -126,23 +142,6 @@ const MessageItem = React.memo(function MessageItem({
       borderBottomLeftRadius: isLastInGroup ? base : small,
     };
   }, [isOwn, isFirstInGroup, isLastInGroup]);
-
-  const handleEdit = useCallback(() => {
-    if (onUpdate && editText.trim() !== message.text) {
-      onUpdate({ ...message, text: editText.trim() });
-    }
-    setIsEditing(false);
-  }, [onUpdate, editText, message]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleEdit();
-    } else if (e.key === "Escape") {
-      setEditText(message.text);
-      setIsEditing(false);
-    }
-  }, [handleEdit, message.text]);
 
   return (
     <div className="animate-fade-in">
@@ -196,38 +195,32 @@ const MessageItem = React.memo(function MessageItem({
               </span>
             )}
 
-            {isEditing ? (
-              <textarea
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={handleEdit}
-                className="w-full bg-transparent resize-none outline-none min-w-[160px]"
-                autoFocus
-              />
+            {/* Reply preview (matching rn-firebase-chat) */}
+            {message.replyMessage && (
+              <ReplyPreview replyMessage={message.replyMessage} isOwn={isOwn} />
+            )}
+
+            {message.type === "image" && message.metadata?.imageUrl ? (
+              <div className="space-y-1">
+                <img
+                  src={message.metadata.imageUrl}
+                  alt="Shared image"
+                  className="max-w-full h-auto rounded-xl"
+                  loading="lazy"
+                />
+                {message.text && <p className="text-sm">{message.text}</p>}
+              </div>
             ) : (
-              <>
-                {message.type === "image" && message.metadata?.imageUrl ? (
-                  <div className="space-y-1">
-                    <img
-                      src={message.metadata.imageUrl}
-                      alt="Shared image"
-                      className="max-w-full h-auto rounded-xl"
-                      loading="lazy"
-                    />
-                    {message.text && <p className="text-sm">{message.text}</p>}
-                  </div>
-                ) : (
-                  <p className="text-sm whitespace-pre-wrap break-words leading-snug">
-                    {message.text}
-                  </p>
-                )}
-                {message.updatedAt && (
-                  <span className={`text-xs ml-1 ${isOwn ? "text-blue-200" : "text-gray-400"}`}>
-                    (edited)
-                  </span>
-                )}
-              </>
+              <p className="text-sm whitespace-pre-wrap break-words leading-snug">
+                {message.text}
+              </p>
+            )}
+
+            {/* (Edited) badge — matching rn-firebase-chat isEdited flag */}
+            {message.isEdited && (
+              <span className={`text-xs ml-1 ${isOwn ? "text-blue-200" : "text-gray-400"}`}>
+                (Edited)
+              </span>
             )}
           </div>
 
@@ -254,11 +247,22 @@ const MessageItem = React.memo(function MessageItem({
           )}
         </div>
 
-        {/* Action buttons — CSS-only visibility, zero React state updates on hover */}
-        {isOwn && !isEditing && (
-          <div className="flex space-x-1 mx-2 self-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        {/* Action buttons — CSS-only visibility, matching mobile long-press actions */}
+        <div className={`flex space-x-1 mx-2 self-center opacity-0 group-hover:opacity-100 transition-opacity duration-150`}>
+          {/* Reply — available for all messages */}
+          <button
+            onClick={() => onReply?.(message)}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+            title="Reply"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+          </button>
+          {/* Edit — own messages only (matching mobile onLongPressMessage) */}
+          {isOwn && (
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => onEdit?.(message)}
               className="p-1 text-gray-400 hover:text-gray-600 rounded"
               title="Edit message"
             >
@@ -266,6 +270,9 @@ const MessageItem = React.memo(function MessageItem({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </button>
+          )}
+          {/* Delete — own messages only */}
+          {isOwn && (
             <button
               onClick={() => onDelete?.(message.id)}
               className="p-1 text-gray-400 hover:text-red-600 rounded"
@@ -275,8 +282,8 @@ const MessageItem = React.memo(function MessageItem({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -288,6 +295,8 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
   partnerUsers,
   onMessageUpdate,
   onMessageDelete,
+  onEdit,
+  onReply,
   className = "",
   messageStatusEnable = true,
   customMessageStatus,
@@ -409,8 +418,9 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
             isLastOwnMessage={isOwn && index === lastMessageIndex}
             isSeen={isLastOwnMessageSeen}
             partnerUser={partnerUserMap.get(message.userId) ?? partnerUsers?.[0]}
-            onUpdate={onMessageUpdate}
             onDelete={onMessageDelete}
+            onEdit={onEdit}
+            onReply={onReply}
             messageStatusEnable={messageStatusEnable}
             customMessageStatus={customMessageStatus}
             sentMessageLabel={unReadSentMessage}

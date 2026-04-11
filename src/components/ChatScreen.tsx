@@ -8,6 +8,7 @@ import { useChat } from "../hooks/useChat";
 import { useTyping } from "../hooks/useTyping";
 import {
   Message,
+  ReplyMessagePreview,
   IUser,
   ConversationProps,
   InputToolbarProps,
@@ -108,6 +109,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const { currentUser, derivedKey, blackListRegex, prefix, storageProvider } =
     useChatContext();
   const [showUploader, setShowUploader] = useState(false);
+  // Edit/reply state (matching rn-firebase-chat ChatScreen pattern)
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [replyMessage, setReplyMessage] = useState<ReplyMessagePreview | null>(null);
+  const [inputText, setInputText] = useState('');
 
   const chatNewModalRef = useRef<ChatNewModalRef>(null);
 
@@ -199,6 +204,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     [currentUser.id, selectedPartners]
   );
 
+  const partnerUserMap = useMemo(() => {
+    const map = new Map<string, IUser>();
+    selectedPartners.forEach((u) => map.set(u.id, u));
+    return map;
+  }, [selectedPartners]);
+
   const chatName = useMemo(
     () =>
       isGroup
@@ -207,7 +218,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     [isGroup, currentUser.id, selectedPartners, selectedName]
   );
 
-  const { messages, loading, error, sendMessage, markAsRead } = useChat({
+  const { messages, loading, error, sendMessage, updateMessage, markAsRead } = useChat({
     user: currentUser,
     conversationId: selectedConversationId || effectiveConversationId,
     memberIds,
@@ -318,7 +329,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const handleSendMessage = useCallback(
     async (text: string) => {
       try {
-        await sendMessage(text);
+        await sendMessage(text, replyMessage ?? undefined);
 
         // Notification callback with configurable delay
         if (sendMessageNotification) {
@@ -330,17 +341,50 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         console.error("Failed to send message:", error);
       }
     },
-    [sendMessage, sendMessageNotification, timeoutSendNotify]
+    [sendMessage, replyMessage, sendMessageNotification, timeoutSendNotify]
   );
 
   const handleSendTextMessage = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
-      await handleSendMessage(text);
-      markAsRead();
+
+      if (editingMessage) {
+        // Edit mode: update the existing message (matching rn-firebase-chat onSend with editingMessage)
+        await updateMessage(editingMessage.id, text.trim());
+        setEditingMessage(null);
+        setInputText('');
+      } else {
+        // Normal send — attach reply data if present (matching rn-firebase-chat)
+        await handleSendMessage(text);
+        if (replyMessage) {
+          setReplyMessage(null);
+        }
+        markAsRead();
+      }
     },
-    [handleSendMessage, markAsRead]
+    [editingMessage, replyMessage, updateMessage, handleSendMessage, markAsRead]
   );
+
+  // Handle edit request from MessageList (matching mobile onLongPressMessage)
+  const handleEditMessage = useCallback((message: Message) => {
+    setEditingMessage(message);
+    setInputText(message.text);
+    setReplyMessage(null);
+  }, []);
+
+  // Handle reply request from MessageList (matching mobile swipe reply)
+  const handleReplyMessage = useCallback((message: Message) => {
+    const partner = partnerUserMap.get(message.userId);
+    setReplyMessage({
+      id: message.id,
+      text: message.text,
+      userId: message.userId,
+      userName: message.userId === String(currentUser.id)
+        ? currentUser.name
+        : partner?.name,
+    });
+    setEditingMessage(null);
+  }, [partnerUserMap, currentUser]);
 
   const handleTyping = useCallback(
     (isTyping: boolean) => {
@@ -488,6 +532,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                       onMessageDelete={(messageId) =>
                         console.log("Delete message:", messageId)
                       }
+                      onEdit={handleEditMessage}
+                      onReply={handleReplyMessage}
                       messageStatusEnable={messageStatusEnable}
                       customMessageStatus={customMessageStatus}
                       unReadSentMessage={unReadSentMessage}
@@ -500,6 +546,84 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
               </div>
 
               <div className="panel-input">
+                {/* Editing banner — matching rn-firebase-chat renderAccessory */}
+                {editingMessage && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "8px 15px",
+                      backgroundColor: "#fff",
+                      borderTop: "1px solid #EEE",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 4,
+                        alignSelf: "stretch",
+                        backgroundColor: "#007AFF",
+                        borderRadius: 2,
+                        marginRight: 10,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#007AFF", marginBottom: 2 }}>
+                        Editing Message
+                      </div>
+                      <div style={{ fontSize: 14, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {editingMessage.text}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setEditingMessage(null); setInputText(''); }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 20, padding: "0 0 0 10px", lineHeight: 1 }}
+                      title="Cancel editing"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {/* Reply banner — matching rn-firebase-chat reply.message preview */}
+                {!editingMessage && replyMessage && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "8px 15px",
+                      backgroundColor: "#fff",
+                      borderTop: "1px solid #EEE",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 4,
+                        alignSelf: "stretch",
+                        backgroundColor: "#34C759",
+                        borderRadius: 2,
+                        marginRight: 10,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#34C759", marginBottom: 2 }}>
+                        Replying to {replyMessage.userName || ""}
+                      </div>
+                      <div style={{ fontSize: 14, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {replyMessage.text}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setReplyMessage(null)}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 20, padding: "0 0 0 10px", lineHeight: 1 }}
+                      title="Cancel reply"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
                 <div
                   className="input-box"
                   style={inputToolbarProps?.containerStyle}
@@ -535,8 +659,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                     <MessageInput
                       onSendMessage={handleSendTextMessage}
                       onTyping={handleTyping}
-                      placeholder="Type your message..."
+                      placeholder={editingMessage ? "Edit your message..." : "Type your message..."}
                       className="message-input-reset"
+                      value={editingMessage ? inputText : undefined}
+                      onValueChange={editingMessage ? setInputText : undefined}
                     />
                   </div>
                 </div>

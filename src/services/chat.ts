@@ -194,6 +194,7 @@ export class ChatService {
       type?: 'private' | 'group';
       name?: string;
       otherName?: string;
+      replyMessage?: { id: string; text: string; userId: string; userName?: string };
     }
   ): Promise<void> {
     try {
@@ -225,6 +226,7 @@ export class ChatService {
         ...message,
         text: filteredText,
         createdAt: serverTimestamp(),
+        ...(conversationOptions?.replyMessage ? { replyMessage: conversationOptions.replyMessage } : {}),
       };
 
       const messageRef = await addDoc(
@@ -301,6 +303,8 @@ export class ChatService {
           received: data.received,
           pending: data.pending,
           senderId: data.senderId,
+          isEdited: data.isEdited,
+          replyMessage: data.replyMessage,
         } as IMessage);
       });
 
@@ -433,6 +437,21 @@ export class ChatService {
     }
   }
 
+  // Update message text (edit) — sets isEdited flag (matching rn-firebase-chat)
+  async updateMessage(conversationId: string, messageId: string, text: string): Promise<void> {
+    try {
+      const messageRef = doc(this.db, this.CONVERSATIONS, conversationId, 'messages', messageId);
+      await updateDoc(messageRef, {
+        text,
+        isEdited: true,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error updating message:', error);
+      throw new Error('Failed to update message');
+    }
+  }
+
   // Delete message
   async deleteMessage(conversationId: string, messageId: string): Promise<void> {
     try {
@@ -487,6 +506,8 @@ export class ChatService {
           received: data.received,
           pending: data.pending,
           senderId: data.senderId,
+          isEdited: data.isEdited,
+          replyMessage: data.replyMessage,
         } as IMessage);
       });
 

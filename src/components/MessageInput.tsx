@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { MessageInputProps } from '../types';
 import { ButtonMaterialIcon } from './ButtonMaterialIcon';
@@ -11,11 +11,30 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   placeholder = 'Type a message...',
   className = '',
   maxInputLength = MAX_INPUT_LENGTH,
+  value: controlledValue,
+  onValueChange,
 }) => {
-  const [message, setMessage] = useState('');
+  const [internalMessage, setInternalMessage] = useState('');
+  // Use controlled value when provided (edit mode), otherwise internal state
+  const message = controlledValue !== undefined ? controlledValue : internalMessage;
+  const setMessage = useCallback((val: string) => {
+    if (controlledValue !== undefined) {
+      onValueChange?.(val);
+    } else {
+      setInternalMessage(val);
+    }
+  }, [controlledValue, onValueChange]);
+
   const [isTyping, setIsTyping] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+
+  // Focus input when controlled value changes (e.g. edit mode activated)
+  useEffect(() => {
+    if (controlledValue !== undefined && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [controlledValue]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     let value = e.target.value;
