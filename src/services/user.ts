@@ -21,21 +21,6 @@ export class UserService {
   }
 
   /**
-   * Check if a user document exists in Firestore
-   * @param userId - The ID of the user to check
-   * @returns Promise<boolean> - True if user exists, false otherwise
-   */
-  async userExists(userId: string): Promise<boolean> {
-    try {
-      const userDoc = await getDoc(doc(this.db, FireStoreCollection.users, userId));
-      return userDoc.exists();
-    } catch (error) {
-      console.error('Error checking user existence:', error);
-      return false;
-    }
-  }
-
-  /**
    * Create a user document if it doesn't exist
    * @param userId - The ID of the user
    * @param userData - Optional user data to store
@@ -46,16 +31,19 @@ export class UserService {
     userData?: Partial<IUserInfo & Pick<UserProfileProps, 'status'>> & Record<string, unknown>
   ): Promise<void> {
     try {
-      const exists = await this.userExists(userId);
-      if (!exists) {
-        await setDoc(doc(this.db, FireStoreCollection.users, userId), {
+      // setDoc with merge:true creates the document if absent, or merges fields if present.
+      // Avoids the extra getDoc round-trip from the old check-then-write pattern.
+      // updatedAt is always refreshed; createdAt uses merge so it is only written on creation.
+      await setDoc(
+        doc(this.db, FireStoreCollection.users, userId),
+        {
           id: userId,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           ...userData,
-        });
-        console.log(`User document ${userId} created successfully.`);
-      }
+        },
+        { merge: true }
+      );
     } catch (error) {
       console.error('Error creating user document:', error);
       throw new Error('Failed to create user document');

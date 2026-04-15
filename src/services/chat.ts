@@ -15,7 +15,6 @@ import {
   getDoc,
   serverTimestamp,
   DocumentSnapshot,
-  Unsubscribe,
   increment,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -52,6 +51,12 @@ export class ChatService {
 
   /** Custom storage provider */
   private storageProvider?: StorageProvider;
+
+  /**
+   * In-memory set of conversation IDs known to exist in Firestore.
+   * Avoids a getDoc existence check on every sendMessage after the first.
+   */
+  private knownConversations = new Set<string>();
 
   constructor() {
     this.db = getFirebaseFirestore();
@@ -146,15 +151,11 @@ export class ChatService {
       let docRefId: string;
 
       if (conversationId) {
-        await updateDoc(
+        // setDoc creates-or-overwrites in a single write — no updateDoc+catch needed
+        await setDoc(
           doc(this.db, this.CONVERSATIONS, conversationId),
           conversationData
-        ).catch(async () => {
-          await setDoc(
-            doc(this.db, this.CONVERSATIONS, conversationId),
-            conversationData
-          );
-        });
+        );
         docRefId = conversationId;
       } else {
         const docRef = await addDoc(
@@ -164,8 +165,11 @@ export class ChatService {
         docRefId = docRef.id;
       }
 
-      // Ensure user documents exist for all members
-      await Promise.all(memberIds.map((id) => this.userService.createUserIfNotExists(id)));
+      this.knownConversations.add(docRefId);
+
+      // Ensure user documents exist for all members (fire-and-forget, non-blocking)
+      Promise.all(memberIds.map((id) => this.userService.createUserIfNotExists(id)))
+        .catch((err) => console.error('Error ensuring user documents:', err));
 
       return docRefId;
     } catch (error) {
@@ -175,11 +179,17 @@ export class ChatService {
   }
 
   private async conversationExists(conversationId: string): Promise<boolean> {
+    // Fast path: if we've seen this conversation before, skip the network read
+    if (this.knownConversations.has(conversationId)) return true;
     try {
       const conversationDoc = await getDoc(
         doc(this.db, this.CONVERSATIONS, conversationId)
       );
-      return conversationDoc.exists();
+      if (conversationDoc.exists()) {
+        this.knownConversations.add(conversationId);
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('Error checking conversation existence:', error);
       return false;
@@ -234,37 +244,29 @@ export class ChatService {
         messageData
       );
 
+      // Build a single atomic conversation update (matching rn-firebase-chat):
+      // - latestMessage + timestamps
+      // - sender's unRead reset to 0 (they just read their own message)
+      // - all other members' unRead incremented by 1
+      const senderId = String(message.senderId);
+      const conversationUpdate: Record<string, unknown> = {
+        latestMessage: convertToLatestMessage(senderId, conversationOptions?.name || '', filteredText || ''),
+        latestMessageTime: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        [`unRead.${senderId}`]: 0,
+      };
+      memberIds.forEach((memberId) => {
+        if (memberId !== senderId) {
+          conversationUpdate[`unRead.${memberId}`] = increment(1);
+        }
+      });
+
       await updateDoc(
         doc(this.db, this.CONVERSATIONS, conversationId),
-        {
-          latestMessage: { ...messageData, id: messageRef.id },
-          latestMessageTime: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }
+        conversationUpdate
       );
-
-      // Update unread counts for other members on the conversation document
-      const conversationDoc = await getDoc(
-        doc(this.db, this.CONVERSATIONS, conversationId)
-      );
-
-      if (conversationDoc.exists()) {
-        const allMembers: string[] = conversationDoc.data()?.members || memberIds;
-        const unreadUpdates: Record<string, unknown> = {};
-        allMembers.forEach((memberId: string) => {
-          if (memberId !== message.senderId) {
-            unreadUpdates[`unRead.${memberId}`] = increment(1);
-          }
-        });
-
-        await updateDoc(
-          doc(this.db, this.CONVERSATIONS, conversationId),
-          {
-            ...unreadUpdates,
-            latestMessage: convertToLatestMessage(`${message.senderId}`, conversationOptions?.name || '', message.text || ''),
-          }
-        );
-      }
+      // Cache so subsequent sends skip the existence check
+      this.knownConversations.add(conversationId);
     } catch (error) {
       console.error('Error sending message:', error);
       throw new Error('Failed to send message');
@@ -335,6 +337,8 @@ export class ChatService {
     return onSnapshot(userConversationsQuery, (snapshot) => {
       const userConversations: ConversationProps[] = [];
       snapshot.forEach((docSnap) => {
+        // Seed existence cache — documents returned by the query definitely exist
+        this.knownConversations.add(docSnap.id);
         const data = docSnap.data();
         const names: Record<string, string> = data.names || {};
         const unreadCounts: Record<string, number> = data.unRead || {};
@@ -343,6 +347,7 @@ export class ChatService {
           name: names[userId] || '',
           members: data.members || [],
           unRead: unreadCounts,
+          typing: data.typing ?? {},
           updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? Date.now(),
           joinedAt: data.createdAt?.toMillis?.() ?? data.createdAt ?? Date.now(),
           latestMessage: data.latestMessage || undefined,
@@ -352,44 +357,44 @@ export class ChatService {
     });
   }
 
-  // Update typing status
+  /**
+   * Update typing status on the conversation document itself (matching rn-firebase-chat).
+   * Writing to the conversation doc avoids a dedicated subcollection listener;
+   * typing data flows through the already-active subscribeToUserConversations channel.
+   */
   async updateTypingStatus(conversationId: string, userId: string, isTyping: boolean): Promise<void> {
     try {
-      const conversationRef = doc(this.db, this.CONVERSATIONS, conversationId);
-      const conversationDataRef = collection(conversationRef, 'data');
-      const typingDocRef = doc(conversationDataRef, 'typing');
-
-      await setDoc(typingDocRef, {
-        [`${userId}`]: isTyping,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+      await updateDoc(
+        doc(this.db, this.CONVERSATIONS, conversationId),
+        { [`typing.${userId}`]: isTyping }
+      );
     } catch (error) {
       console.error('Error updating typing status:', error);
     }
   }
 
-  // Subscribe to typing status
-  subscribeToTypingStatus(
+  /**
+   * Subscribe to a conversation document for real-time unRead + typing updates.
+   * Matches rn-firebase-chat's userConversationListener.
+   */
+  subscribeToConversation(
     conversationId: string,
-    callback: (typingUsers: Record<string, boolean>) => void
-  ): Unsubscribe {
-    const conversationRef = doc(this.db, this.CONVERSATIONS, conversationId);
-    const typingDocRef = doc(conversationRef, 'data', 'typing');
-
-    return onSnapshot(typingDocRef, (snapshot) => {
-      const data = snapshot.data();
-      const typingUsers: Record<string, boolean> = {};
-
-      if (data) {
-        Object.keys(data).forEach(userId => {
-          if (userId !== 'updatedAt' && data[userId] === true) {
-            typingUsers[userId] = true;
-          }
+    callback: (data: { unRead?: Record<string, number>; typing?: Record<string, boolean> } | undefined) => void
+  ): () => void {
+    return onSnapshot(
+      doc(this.db, this.CONVERSATIONS, conversationId),
+      (snap) => {
+        if (!snap.exists()) {
+          callback(undefined);
+          return;
+        }
+        const data = snap.data();
+        callback({
+          unRead: data?.unRead ?? {},
+          typing: data?.typing ?? {},
         });
       }
-
-      callback(typingUsers);
-    });
+    );
   }
 
   // Update unread count on the main conversation document

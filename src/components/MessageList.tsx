@@ -303,32 +303,25 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
   unReadSentMessage,
   unReadSeenMessage,
   maxPageSize,
+  userUnreadMessage = false,
 }) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [pageCount, setPageCount] = useState(1);
-  const prevScrollHeightRef = useRef<number | null>(null);
+  // Saved scrollHeight before prepending older messages — used to restore position
+  const prevScrollHeightRef = useRef(0);
 
   // Reset pagination when conversation changes (messages go empty)
   useEffect(() => {
     if (messages.length === 0) setPageCount(1);
   }, [messages.length]);
 
+  // Scroll to bottom when a new message arrives and the user is already at the bottom
   useEffect(() => {
-    if (autoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [messages, autoScroll]);
-
-  // Restore scroll position after prepending older messages
-  useLayoutEffect(() => {
-    if (prevScrollHeightRef.current !== null && containerRef.current) {
-      containerRef.current.scrollTop +=
-        containerRef.current.scrollHeight - prevScrollHeightRef.current;
-      prevScrollHeightRef.current = null;
-    }
-  });
 
   const displayedMessages = useMemo(() => {
     if (!maxPageSize) return messages;
@@ -338,15 +331,29 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
   const hasMore = !!maxPageSize && messages.length > pageCount * maxPageSize;
 
   const loadMore = useCallback(() => {
-    if (!hasMore || !containerRef.current) return;
-    prevScrollHeightRef.current = containerRef.current.scrollHeight;
+    if (!hasMore) return;
+    // Save scroll height before older messages are prepended so we can restore position
+    if (containerRef.current) {
+      prevScrollHeightRef.current = containerRef.current.scrollHeight;
+    }
     setPageCount((p) => p + 1);
   }, [hasMore]);
+
+  // After older messages are prepended, restore scroll position so the view doesn't jump
+  useLayoutEffect(() => {
+    if (prevScrollHeightRef.current && containerRef.current) {
+      const added = containerRef.current.scrollHeight - prevScrollHeightRef.current;
+      containerRef.current.scrollTop += added;
+      prevScrollHeightRef.current = 0;
+    }
+  });
 
   const handleScroll = useCallback(() => {
     if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    // Auto-scroll is active when the user is near the bottom (newest messages)
     setAutoScroll(scrollHeight - scrollTop - clientHeight < 100);
+    // Load older messages when the user scrolls near the top
     if (scrollTop < 40) loadMore();
   }, [loadMore]);
 
@@ -357,15 +364,10 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
     return map;
   }, [partnerUsers]);
 
-  const lastMessage = displayedMessages[displayedMessages.length - 1];
-  const lastMessageIndex = displayedMessages.length - 1;
+  // Render in natural order: oldest at top, newest at bottom
+  const renderedMessages = displayedMessages;
 
-  const isLastOwnMessageSeen = useMemo(() => {
-    if (!lastMessage || lastMessage.userId !== currentUser.id) return false;
-    return Object.entries(lastMessage.readBy || {}).some(
-      ([uid, read]) => uid !== currentUser.id && read
-    );
-  }, [lastMessage, currentUser.id]);
+  const isLastOwnMessageSeen = !userUnreadMessage;
 
   if (messages.length === 0) {
     return (
@@ -385,6 +387,7 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
       onScroll={handleScroll}
       className={`flex-1 overflow-y-auto bg-white px-4 py-4 ${className}`}
     >
+      {/* "Load earlier" sits at the top — that's where older messages live */}
       {hasMore && (
         <div className="flex justify-center py-2">
           <button
@@ -395,13 +398,20 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
           </button>
         </div>
       )}
-      {displayedMessages.map((message, index) => {
+      {renderedMessages.map((message, index) => {
         const isOwn = message.userId === currentUser.id;
-        const prevMessage = index > 0 ? displayedMessages[index - 1] : null;
-        const nextMessage = index < displayedMessages.length - 1 ? displayedMessages[index + 1] : null;
+        // Natural order: prevMessage is chronologically older (visually above),
+        // nextMessage is chronologically newer (visually below).
+        const prevMessage = index > 0 ? renderedMessages[index - 1] : null;
+        const nextMessage = index < renderedMessages.length - 1 ? renderedMessages[index + 1] : null;
 
+        // isFirstInGroup: no message from the same user immediately above this one
         const isFirstInGroup = !prevMessage || prevMessage.userId !== message.userId;
+        // isLastInGroup: no message from the same user immediately below this one
         const isLastInGroup = !nextMessage || nextMessage.userId !== message.userId;
+
+        // Show a date separator above the first message of each day.
+        // prevMessage is chronologically older (visually above); separator fires when the day changes.
         const showDateSeparator =
           !prevMessage ||
           !isSameDay(new Date(message.createdAt), new Date(prevMessage.createdAt));
@@ -415,7 +425,8 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
             isFirstInGroup={isFirstInGroup}
             isLastInGroup={isLastInGroup}
             showDateSeparator={showDateSeparator}
-            isLastOwnMessage={isOwn && index === lastMessageIndex}
+            // last index = newest own message (chronologically last sent)
+            isLastOwnMessage={isOwn && index === renderedMessages.length - 1}
             isSeen={isLastOwnMessageSeen}
             partnerUser={partnerUserMap.get(message.userId) ?? partnerUsers?.[0]}
             onDelete={onMessageDelete}
@@ -428,7 +439,6 @@ export const MessageList: React.FC<MessageListProps & { partnerUsers?: IUser[] }
           />
         );
       })}
-      <div ref={messagesEndRef} />
     </div>
   );
 };

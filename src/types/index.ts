@@ -115,6 +115,7 @@ export interface ConversationProps {
   image?: string;
   members: string[];
   unRead?: Record<string, number>;
+  typing?: Record<string, boolean>;
   updatedAt: number;
   joinedAt?: number;
   latestMessage?: LatestMessageProps;
@@ -347,6 +348,11 @@ export interface MessageListProps {
   unReadSeenMessage?: string;
   /** Max messages to display per page; scroll to top loads the previous page */
   maxPageSize?: number;
+  /**
+   * True when other members have unread messages — used to show Sent vs Seen indicator
+   * on the last own message. Matches rn-firebase-chat userUnreadMessage.
+   */
+  userUnreadMessage?: boolean;
 }
 
 export interface MessageInputProps {
@@ -383,6 +389,8 @@ export interface UseChatReturn {
   messages: Message[];
   loading: boolean;
   error: string | null;
+  /** True when other members have unread messages (my last message is "sent" not "seen"). Matches rn-firebase-chat. */
+  userUnreadMessage: boolean;
   sendMessage: (text: string, replyMessage?: ReplyMessagePreview) => Promise<void>;
   updateMessage: (messageId: string, text: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;

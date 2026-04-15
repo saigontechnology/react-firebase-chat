@@ -66,13 +66,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [onTyping, isTyping, maxInputLength]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }, []);
-
   const handleSend = useCallback(() => {
     const trimmedMessage = message.trim();
     if (trimmedMessage && !disabled) {
@@ -95,6 +88,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       textareaRef.current?.focus();
     }
   }, [message, disabled, onSendMessage, isTyping, onTyping]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }, [handleSend]);
 
   const handlePaste = useCallback((_e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     // Paste is allowed — max length is enforced on change
