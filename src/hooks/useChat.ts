@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatService } from '../services/chat';
-import { Message, IMessage, IUser, UseChatReturn, MediaType } from '../types';
+import { Message, IMessage, IUser, UseChatReturn, MediaType, ReplyMessagePreview } from '../types';
 import { useChatContext } from '../context/ChatProvider';
 import { encryptData, decryptedMessageData } from '../utils/encryption';
 
@@ -23,6 +23,8 @@ const convertMessages = async (rawMessages: IMessage[], key: string | null): Pro
           msg.audio || msg.video ? 'file' :
             'text',
       readBy: msg.readBy ?? {},
+      isEdited: msg.isEdited,
+      replyMessage: msg.replyMessage,
       metadata: msg.image ? { imageUrl: msg.image, fileType: 'image' } : undefined,
     }))
   );
@@ -77,7 +79,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
   }, [conversationId, chatService, enableEncrypt]);
 
   // Send a text message
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, replyMessage?: ReplyMessagePreview) => {
     try {
       if (!conversationId) {
         throw new Error('No conversation selected');
@@ -109,12 +111,36 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
         memberIds,
         name: user?.name || 'Current User',
         otherName: name,
+        replyMessage,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
       throw err;
     }
   }, [conversationId, user?.id, user?.name, chatService, memberIds, name, enableEncrypt, encryptionFuncProps]);
+
+  // Update (edit) a message — sets isEdited flag (matching rn-firebase-chat)
+  const updateMessage = useCallback(async (messageId: string, text: string) => {
+    try {
+      if (!conversationId) {
+        throw new Error('No conversation selected');
+      }
+
+      let encryptedText = text;
+      if (enableEncrypt) {
+        if (encryptionFuncProps?.encryptFunctionProp) {
+          encryptedText = await encryptionFuncProps.encryptFunctionProp(text);
+        } else if (derivedKeyRef.current) {
+          encryptedText = await encryptData(text, derivedKeyRef.current);
+        }
+      }
+
+      await chatService.updateMessage(conversationId, messageId, encryptedText);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update message');
+      throw err;
+    }
+  }, [conversationId, chatService, enableEncrypt, encryptionFuncProps]);
 
   // Delete a message
   const deleteMessage = useCallback(async (messageId: string) => {
@@ -148,6 +174,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
     loading,
     error,
     sendMessage,
+    updateMessage,
     deleteMessage,
     markAsRead,
   };

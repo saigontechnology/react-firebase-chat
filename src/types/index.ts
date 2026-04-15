@@ -26,6 +26,8 @@ export interface IMessage {
   senderId?: string;
   type?: MediaType;
   readBy?: Record<string, boolean>;
+  isEdited?: boolean;
+  replyMessage?: { id: string; text: string; userId: string; userName?: string };
 }
 
 export interface IUser {
@@ -228,16 +230,26 @@ export interface User {
   status?: 'online' | 'away' | 'busy' | 'offline';
 }
 
-// Extended Message interface for ReactJS features  
+// Reply preview stored inside a message document
+export interface ReplyMessagePreview {
+  id: string;
+  text: string;
+  userId: string;
+  userName?: string;
+}
+
+// Extended Message interface for ReactJS features
 export interface Message {
   id: string;
   text: string;
   userId: string;
   createdAt: number; // timestamp in milliseconds
   updatedAt?: number; // timestamp in milliseconds
+  isEdited?: boolean;
   type: 'text' | 'image' | 'file' | 'system';
   readBy: Record<string, boolean>;
   replyTo?: string; // Message ID this is replying to
+  replyMessage?: ReplyMessagePreview; // Inline reply preview (matching rn-firebase-chat)
   metadata?: {
     fileName?: string;
     fileSize?: number;
@@ -324,6 +336,10 @@ export interface MessageListProps {
   currentUser: IUser;
   onMessageUpdate?: (message: Message) => void;
   onMessageDelete?: (messageId: string) => void;
+  /** Called when the user requests to edit a message (own messages only) */
+  onEdit?: (message: Message) => void;
+  /** Called when the user requests to reply to a message */
+  onReply?: (message: Message) => void;
   className?: string;
   messageStatusEnable?: boolean;
   customMessageStatus?: (hasUnread: boolean) => React.ReactNode;
@@ -340,6 +356,9 @@ export interface MessageInputProps {
   placeholder?: string;
   className?: string;
   maxInputLength?: number;
+  /** Controlled value — used by ChatScreen to pre-fill text when editing a message */
+  value?: string;
+  onValueChange?: (text: string) => void;
 }
 
 export interface UserAvatarProps {
@@ -364,7 +383,8 @@ export interface UseChatReturn {
   messages: Message[];
   loading: boolean;
   error: string | null;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, replyMessage?: ReplyMessagePreview) => Promise<void>;
+  updateMessage: (messageId: string, text: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   markAsRead: () => Promise<void>;
 }
