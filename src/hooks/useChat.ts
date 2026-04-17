@@ -55,7 +55,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
     convertMessages(rawMessagesRef.current, effectiveKey).then(setMessages);
   }, [effectiveKey]);
 
-  // Stable subscription — never torn down unless conversationId changes
+  // Message subscription — never torn down unless conversationId changes
   useEffect(() => {
     if (!conversationId) {
       setLoading(false);
@@ -155,13 +155,10 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
     }
   }, [conversationId, chatService]);
 
-  // Mark message as read
+  // Mark conversation as read — resets current user's unRead to 0 (matching rn-firebase-chat changeReadMessage)
   const markAsRead = useCallback(async () => {
     try {
-      if (!conversationId) {
-        console.log('No conversation selected');
-        return;
-      }
+      if (!conversationId) return;
       await chatService.updateUnread(conversationId, user.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark as read');
@@ -173,6 +170,7 @@ export const useChat = ({ user, conversationId, memberIds, name }: UseChatProps)
     messages,
     loading,
     error,
+    userUnreadMessage: false, // Computed in ChatScreen from conversations state — no extra listener
     sendMessage,
     updateMessage,
     deleteMessage,

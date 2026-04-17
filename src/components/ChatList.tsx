@@ -176,8 +176,8 @@ export const ChatList: React.FC<ChatListProps> = ({
                 </span>
               </div>
             </div>
-            {(c.unRead?.[currentUser?.id ?? ""] || 0) > 0 && (
-              <span className="unread-badge">{c.unRead?.[currentUser?.id ?? ""] || 0}</span>
+            {selectedConversationId !== c.id && (c.unRead?.[String(currentUser?.id ?? "")] || 0) > 0 && (
+              <span className="unread-badge">{c.unRead?.[String(currentUser?.id ?? "")] || 0}</span>
             )}
           </button>
         ))}

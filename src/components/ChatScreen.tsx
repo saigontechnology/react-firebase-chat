@@ -210,6 +210,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     return map;
   }, [selectedPartners]);
 
+  const convId = selectedConversationId || effectiveConversationId;
+
+  /**
+   * Derived from the already-live conversations list — no extra Firestore listener needed.
+   * Same logic as rn-firebase-chat useChatScreen: true when any other member has a
+   * different unRead count than me (they haven't read my last message yet → "Sent").
+   */
+  const userUnreadMessage = useMemo(() => {
+    if (!convId || !currentUser?.id) return false;
+    const conv = conversations.find((c) => c.id === convId);
+    if (!conv?.unRead) return false;
+    const myId = String(currentUser.id);
+    const myUnread = conv.unRead[myId] ?? 0;
+    return Object.entries(conv.unRead).some(([uid, v]) => uid !== myId && v !== myUnread);
+  }, [conversations, convId, currentUser?.id]);
+
   const chatName = useMemo(
     () =>
       isGroup
@@ -220,16 +236,23 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const { messages, loading, error, sendMessage, updateMessage, markAsRead } = useChat({
     user: currentUser,
-    conversationId: selectedConversationId || effectiveConversationId,
+    conversationId: convId,
     memberIds,
     name: chatName,
   });
 
-  // Typing hook with configurable timeout
+  // Derive typing data from the already-live conversations state (no extra listener)
+  const selectedConversationTyping = useMemo(() => {
+    if (!convId) return undefined;
+    return conversations.find((c) => c.id === convId)?.typing;
+  }, [conversations, convId]);
+
+  // Typing hook — write side only; read side comes from subscribeToUserConversations
   const { typingUsers, setTyping } = useTyping(
-    selectedConversationId || effectiveConversationId || "",
+    convId || "",
     `${currentUser.id}`,
-    typingTimeoutSeconds
+    typingTimeoutSeconds,
+    selectedConversationTyping
   );
 
   // Lifecycle callbacks
@@ -306,25 +329,32 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
-  // Reset unread count when a conversation is selected
+  // Mark as read when the conversation is selected or when new messages arrive while viewing.
+  // This ensures unread is never incremented for a user who is actively on the screen.
   useEffect(() => {
-    if (selectedConversationId) {
-      markAsRead();
-    }
-  }, [selectedConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!convId || messages.length === 0) return;
+    markAsRead();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convId, messages.length]);
 
-  // Resolve partner avatars when conversations load and partners are missing avatar info
-  // Fixed: removed selectedPartners from deps to prevent infinite loop
-  // (resolvePartners -> setSelectedPartners -> re-trigger this effect)
+  // Track which conversation ID we've already resolved partners for.
+  // Without this, the effect would fire on every conversation-list update
+  // (new message, unread change, etc.) and trigger N getUserById reads each time.
+  const resolvedConvIdRef = useRef<string | undefined>(undefined);
+
+  // Resolve partner avatars — only when the selected conversation actually changes,
+  // not on every conversations-list update (which would re-fire on every message).
   useEffect(() => {
-    const convId = selectedConversationId || effectiveConversationId;
     if (!convId || conversations.length === 0) return;
+    // Skip if we already resolved this exact conversation
+    if (resolvedConvIdRef.current === convId) return;
     const conv = conversations.find((c) => c.id === convId);
     if (conv) {
+      resolvedConvIdRef.current = convId;
       resolvePartners(conv);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversations, selectedConversationId, effectiveConversationId]);
+  }, [conversations, convId]);
 
   const handleSendMessage = useCallback(
     async (text: string) => {
@@ -437,6 +467,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const handleSelectConversation = useCallback(
     (conversation: ConversationProps) => {
+      resolvedConvIdRef.current = conversation.id; // mark resolved before resolvePartners sets state
       setSelectedConversationId(conversation.id);
       setSelectedName(conversation.name || "");
       resolvePartners(conversation);
@@ -539,6 +570,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                       unReadSentMessage={unReadSentMessage}
                       unReadSeenMessage={unReadSeenMessage}
                       maxPageSize={maxPageSize}
+                      userUnreadMessage={userUnreadMessage}
                     />
                     {enableTyping && <TypingIndicator typingUsers={typingUsers} />}
                   </>
